@@ -1,499 +1,146 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IBM Telco Customer Churn & CLV Intelligence Platform</title>
-  <!-- Tailwind CSS CDN -->
+  <title>Churn and lifetime value lab · IBM Telco AI</title>
+  <meta name="description" content="Score a telecom customer's churn risk, see what drives it, project lifetime value and test retention offers against the live model.">
+  <link rel="stylesheet" href="../static/css/app.css">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    /* Tailwind reads the Hallmark tokens: every name here is a var() of a token in tokens.css */
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              400: '#818cf8',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
-              900: '#1e1b4b',
-              950: '#0f172a',
-            },
-            surface: {
-              card: 'rgba(15, 23, 42, 0.75)',
-              border: 'rgba(255, 255, 255, 0.08)',
-              glow: 'rgba(99, 102, 241, 0.15)'
-            }
+            paper: 'var(--color-paper)', 'paper-2': 'var(--color-paper-2)', 'paper-3': 'var(--color-paper-2)',
+            cotton: 'var(--color-cotton)', ink: 'var(--color-ink)', 'ink-2': 'var(--color-ink-2)', muted: 'var(--color-muted)',
+            rule: 'var(--color-rule)', 'rule-2': 'var(--color-rule-2)',
+            accent: 'var(--color-accent)', 'accent-2': 'var(--color-accent-2)',
+            board: 'var(--color-board)', 'board-type': 'var(--color-board-type)', scrim: 'var(--color-scrim)',
+            risk: 'var(--color-risk)', ok: 'var(--color-ok)', caution: 'var(--color-caution)',
+            'tint-risk': 'var(--tint-risk)', 'tint-ok': 'var(--tint-ok)', 'tint-caution': 'var(--tint-caution)', 'tint-accent': 'var(--tint-accent)',
+            'line-risk': 'var(--line-risk)', 'line-ok': 'var(--line-ok)', 'line-caution': 'var(--line-caution)', 'line-accent': 'var(--line-accent)'
           },
-          fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
-          }
+          borderRadius: { sheet: 'var(--radius-card)', field: 'var(--radius-input)' },
+          fontFamily: { sans: ['var(--font-body)'], mono: ['var(--font-outlier)'] }
         }
       }
     }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Chart.js for Dynamic Visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- KaTeX for mathematical formulas rendering -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
-
-  <style>
-    /* Custom Scrollbar & Glassmorphic Utilities */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.6);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(99, 102, 241, 0.35);
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(99, 102, 241, 0.6);
-    }
-
-    .glass-card {
-      background: rgba(15, 23, 42, 0.72);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
-    }
-    .glass-card:hover {
-      border-color: rgba(255, 255, 255, 0.14);
-    }
-
-    .glass-glow-cyan {
-      box-shadow: 0 0 30px -5px rgba(6, 182, 212, 0.35);
-    }
-    .glass-glow-rose {
-      box-shadow: 0 0 35px -5px rgba(244, 63, 94, 0.35);
-    }
-    .glass-glow-emerald {
-      box-shadow: 0 0 30px -5px rgba(16, 185, 129, 0.35);
-    }
-    .glass-glow-indigo {
-      box-shadow: 0 0 35px -5px rgba(99, 102, 241, 0.4);
-    }
-
-    .radial-meter-bg {
-      stroke: rgba(255, 255, 255, 0.07);
-    }
-    .radial-meter-indicator {
-      transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
-    }
-
-    /* Premium Range Slider styling */
-    input[type=range] {
-      -webkit-appearance: none;
-      appearance: none;
-      background: rgba(30, 41, 59, 0.8);
-      border-radius: 9999px;
-      height: 6px;
-      outline: none;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #818cf8;
-      border: 2px solid #ffffff;
-      cursor: pointer;
-      box-shadow: 0 0 12px rgba(99, 102, 241, 0.8);
-      transition: transform 0.15s ease, background-color 0.15s ease;
-    }
-    input[type=range]::-webkit-slider-thumb:hover {
-      transform: scale(1.25);
-      background: #6366f1;
-    }
-
-    .concept-tag {
-      background: rgba(99, 102, 241, 0.12);
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      color: #a5b4fc;
-    }
-
-    /* Tabular numbers for smooth metric tick animation */
-    .tabular-nums {
-      font-variant-numeric: tabular-nums;
-    }
-
-    @keyframes pulseSoft {
-      0%, 100% { opacity: 0.9; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.02); }
-    }
-    .pulse-soft {
-      animation: pulseSoft 3s ease-in-out infinite;
-    }
-
-    /* Requirement 1: Pulsing border & glowing badge for Critical Risk accounts (>80%) */
-    @keyframes pulseCriticalBorder {
-      0%, 100% {
-        border-color: rgba(239, 68, 68, 0.95);
-        box-shadow: 0 0 25px rgba(239, 68, 68, 0.5), 0 0 50px rgba(245, 158, 11, 0.25), inset 0 0 15px rgba(239, 68, 68, 0.15);
-      }
-      50% {
-        border-color: rgba(245, 158, 11, 0.95);
-        box-shadow: 0 0 35px rgba(245, 158, 11, 0.6), 0 0 70px rgba(239, 68, 68, 0.3), inset 0 0 20px rgba(245, 158, 11, 0.25);
-      }
-    }
-    @keyframes pulseCriticalBadge {
-      0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 0 12px rgba(239, 68, 68, 0.85);
-        border-color: rgba(239, 68, 68, 1);
-        background-color: rgba(239, 68, 68, 0.25);
-      }
-      50% {
-        transform: scale(1.06);
-        box-shadow: 0 0 22px rgba(245, 158, 11, 0.95);
-        border-color: rgba(245, 158, 11, 1);
-        background-color: rgba(245, 158, 11, 0.3);
-      }
-    }
-    .critical-border-pulse {
-      animation: pulseCriticalBorder 2.2s ease-in-out infinite !important;
-    }
-    .critical-badge-pulse {
-      animation: pulseCriticalBadge 2.2s ease-in-out infinite !important;
-    }
-
-    /* High-contrast WCAG Projector Palette */
-    :root {
-      --color-critical-red: #ef4444;
-      --color-moderate-amber: #f59e0b;
-      --color-retained-emerald: #10b981;
-    }
-    .text-contrast-red { color: #ef4444 !important; }
-    .text-contrast-amber { color: #f59e0b !important; }
-    .text-contrast-emerald { color: #10b981 !important; }
-
-    /* Requirement 1: Smooth SHAP Waterfall Bar Transitions */
-    .shap-bar-fill {
-      transition: width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.3s ease;
-      will-change: width;
-    }
-
-    /* Requirement 2: PDF Executive Report Dossier & Print Stylesheet */
-    @media print {
-      /* Force white-paper corporate dossier background and ink typography */
-      html, body {
-        background: #ffffff !important;
-        color: #0f172a !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      /* Hide chrome, navbars, background ambient glows, form controls, visualizer labs, and non-dossier buttons */
-      header,
-      .ambient-glow,
-      .fixed.inset-0,
-      #simForm,
-      #view-dashboard > div.lg\:col-span-5,
-      #view-visualizer,
-      #view-concepts,
-      #toastNotification,
-      button,
-      .no-print,
-      .close-modal-btn,
-      .modal-actions {
-        display: none !important;
-      }
-
-      @page {
-        size: A4 portrait;
-        margin: 10mm 14mm 10mm 14mm;
-      }
-
-      /* Elevate Audit Modal into a crisp single-page corporate dossier */
-      #auditReportModal {
-        position: static !important;
-        display: block !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-        background: transparent !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        box-shadow: none !important;
-        backdrop-filter: none !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-
-      #auditReportModal > div {
-        max-width: 100% !important;
-        width: 100% !important;
-        background: #ffffff !important;
-        border: 1.5px solid #0f172a !important;
-        box-shadow: none !important;
-        color: #0f172a !important;
-        padding: 1.25rem !important;
-        border-radius: 6px !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-
-      .print-box-neutral {
-        background: #f8fafc !important;
-        border: 1px solid #cbd5e1 !important;
-        color: #0f172a !important;
-      }
-
-      .print-header-watermark {
-        display: flex !important;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 2px solid #0f172a;
-        padding-bottom: 6px;
-        margin-bottom: 12px;
-      }
-
-      .print-footer-watermark {
-        display: flex !important;
-        justify-content: space-between;
-        align-items: center;
-        border-top: 1.5px solid #0f172a;
-        padding-top: 6px;
-        margin-top: 14px;
-        font-size: 8.5px;
-        font-family: 'JetBrains Mono', monospace;
-        color: #475569 !important;
-      }
-
-      /* High-contrast ink text for print */
-      #auditReportModal h1, #auditReportModal h2, #auditReportModal h3, #auditReportModal h4 {
-        color: #0f172a !important;
-      }
-      #auditReportModal p, #auditReportModal span, #auditReportModal div {
-        color: #1e293b !important;
-      }
-      .text-slate-400, .text-slate-500 {
-        color: #64748b !important;
-      }
-      .modal-dossier-pill {
-        border: 1px solid #94a3b8 !important;
-        background: #f1f5f9 !important;
-        color: #0f172a !important;
-      }
-    }
-  </style>
 </head>
-<body class="bg-[#090d16] text-slate-100 min-h-screen selection:bg-indigo-500 selection:text-white font-sans antialiased overflow-x-hidden">
+<body class="bg-paper-2 text-ink min-h-screen font-sans antialiased">
 
-  <!-- Subtle Ambient Background Glows -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
-    <div class="absolute -top-40 left-1/4 w-[700px] h-[700px] bg-indigo-900/20 rounded-full blur-[150px]"></div>
-    <div class="absolute top-1/2 -right-40 w-[600px] h-[600px] bg-cyan-900/15 rounded-full blur-[150px]"></div>
-    <div class="absolute -bottom-40 left-1/3 w-[650px] h-[650px] bg-violet-900/20 rounded-full blur-[150px]"></div>
-  </div>
+  <div class="flex flex-col min-h-screen">
 
-  <div class="relative z-10 flex flex-col min-h-screen">
-    
-    <!-- TOP NAVIGATION & EXECUTIVE TELEMETRY -->
-    <header class="border-b border-white/10 bg-[#0c1220]/90 backdrop-blur-xl sticky top-0 z-50 shadow-lg shadow-black/20">
-      <div class="max-w-[1720px] mx-auto px-4 sm:px-6 py-3">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          
-          <!-- Brand & Model Tag -->
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-3">
-              <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-500 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/25 flex items-center justify-center">
-                <div class="h-full w-full bg-[#0d1424] rounded-[10px] flex items-center justify-center">
-                  <i data-lucide="graduation-cap" class="w-5 h-5 text-indigo-400"></i>
-                </div>
-              </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold uppercase tracking-widest text-indigo-400">IBM Telco AI</span>
-                  <span class="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/30 flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Microservice
-                  </span>
-                </div>
-                <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                  Churn Prediction, CLV Modeling & Retention Lab
-                </h1>
-              </div>
-            </div>
+    <!-- TOP BAR: wordmark, the three destinations, search and actions -->
+    <header class="app-bar no-print">
+      <div class="app-bar__inner">
+        <a href="/" class="wordmark" aria-label="IBM Telco AI, home">IBM Telco AI</a>
 
-            <!-- Global View Tabs -->
-            <div class="flex items-center bg-slate-900/90 p-1 rounded-xl border border-white/10 ml-0 lg:ml-4 overflow-x-auto">
-              <button onclick="switchView('dashboard')" id="tabBtn-dashboard" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all bg-indigo-600 text-white shadow-md shadow-indigo-600/30 whitespace-nowrap">
-                <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-                <span>Interactive Platform</span>
-              </button>
-              
-              <button onclick="switchView('visualizer')" id="tabBtn-visualizer" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap">
-                <i data-lucide="trending-down" class="w-3.5 h-3.5 text-emerald-400"></i>
-                <span>Retention Measures Visualizer</span>
-                <span class="px-1.5 py-0.2 text-[9px] bg-emerald-500/20 text-emerald-300 rounded font-mono">Live Charts</span>
-              </button>
+        <nav class="app-tabs" aria-label="Views">
+          <button type="button" onclick="switchView('dashboard')" id="tabBtn-dashboard" class="app-tab is-active">Interactive platform</button>
+          <button type="button" onclick="switchView('visualizer')" id="tabBtn-visualizer" class="app-tab">Retention visualizer</button>
+          <button type="button" onclick="switchView('concepts')" id="tabBtn-concepts" class="app-tab">ML concepts</button>
+        </nav>
 
-              <button onclick="switchView('concepts')" id="tabBtn-concepts" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap">
-                <i data-lucide="book-open" class="w-3.5 h-3.5 text-amber-400"></i>
-                <span>ML Concepts & Teacher Defense</span>
-                <span class="px-1.5 py-0.2 text-[9px] bg-amber-500/20 text-amber-300 rounded font-mono">9 Topics</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Quick Actions & Search -->
-          <div class="flex items-center gap-3">
-            <div class="relative hidden sm:block">
-              <div class="flex items-center bg-slate-900/90 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus-within:border-indigo-500 transition-colors">
-                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 mr-2"></i>
-                <input type="text" id="quickAccountSearch" oninput="handleCustomerSearch(this.value)" placeholder="Search ID (e.g. 8841, 4491)..." class="bg-transparent border-none outline-none w-52 text-slate-200 placeholder:text-slate-500 font-mono text-xs">
-              </div>
-            </div>
-
-            <button onclick="openAuditModal()" class="px-3 py-1.5 text-xs font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-lg flex items-center gap-1.5 transition-all shadow-sm">
-              <i data-lucide="file-text" class="w-3.5 h-3.5 text-cyan-400"></i>
-              <span>Audit Report</span>
-            </button>
-
-            <button onclick="resetToDefaults()" class="px-3 py-1.5 text-xs font-medium text-indigo-300 hover:text-indigo-200 bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-500/30 rounded-lg flex items-center gap-1.5 transition-all">
-              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-              <span>Reset</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Macro KPI Telemetry Row -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-white/5">
-          <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-white/5">
-            <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Portfolio Churn Rate</p>
-              <div class="flex items-baseline gap-2 mt-0.5">
-                <span class="text-xl font-bold font-mono text-white tabular-nums">26.5%</span>
-                <span class="text-[11px] font-medium text-emerald-400 flex items-center">
-                  <i data-lucide="arrow-down-right" class="w-3 h-3"></i> Imbalanced Class
-                </span>
-              </div>
-            </div>
-            <div class="h-9 w-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-              <i data-lucide="pie-chart" class="w-4 h-4"></i>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-white/5">
-            <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Protected CLV (Mo.)</p>
-              <div class="flex items-baseline gap-2 mt-0.5">
-                <span class="text-xl font-bold font-mono text-white tabular-nums">$4.28M</span>
-                <span class="text-[11px] font-medium text-emerald-400 flex items-center">
-                  <i data-lucide="arrow-up-right" class="w-3 h-3"></i> Discounted NPV
-                </span>
-              </div>
-            </div>
-            <div class="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-              <i data-lucide="shield-check" class="w-4 h-4"></i>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-white/5">
-            <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Active Critical Accounts</p>
-              <div class="flex items-baseline gap-2 mt-0.5">
-                <span class="text-xl font-bold font-mono text-rose-400 tabular-nums">342</span>
-                <span class="text-[11px] font-medium text-rose-400 flex items-center">
-                  <i data-lucide="alert-triangle" class="w-3 h-3"></i> High Risk Tier
-                </span>
-              </div>
-            </div>
-            <div class="h-9 w-9 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-400">
-              <i data-lucide="user-x" class="w-4 h-4"></i>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-white/5">
-            <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Model Latency & Engine</p>
-              <div class="flex items-baseline gap-2 mt-0.5">
-                <span class="text-xl font-bold font-mono text-cyan-300 tabular-nums" id="serverLatencyDisplay">14.2ms</span>
-                <span class="text-[11px] font-medium text-cyan-400 flex items-center">
-                  <i data-lucide="zap" class="w-3 h-3"></i> XGBoost-v1.08
-                </span>
-              </div>
-            </div>
-            <div class="h-9 w-9 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
-              <i data-lucide="cpu" class="w-4 h-4"></i>
-            </div>
-          </div>
+        <div class="app-actions">
+          <label class="search" for="quickAccountSearch">
+            <span data-lucide="search" class="w-4 h-4 text-muted" aria-hidden="true"></span>
+            <span class="visually-hidden">Search customer ID</span>
+            <input type="text" id="quickAccountSearch" oninput="handleCustomerSearch(this.value)" placeholder="Customer ID, e.g. 8841" autocomplete="off" inputmode="numeric">
+          </label>
+          <button type="button" onclick="openAuditModal()" class="btn btn--stock">Audit report</button>
+          <button type="button" onclick="resetToDefaults()" class="btn btn--stock">Reset</button>
         </div>
       </div>
     </header>
 
+    <!-- FIGURES THE PAGE REPORTS -->
+    <section class="stat-row" aria-label="Portfolio figures">
+      <h1 class="page-title">Churn Prediction, CLV Modeling &amp; Retention Lab</h1>
+      <dl class="stat-row__inner">
+        <div class="stat">
+          <dt>Portfolio churn rate</dt>
+          <dd class="num">26.5%</dd>
+          <p>Imbalanced class</p>
+        </div>
+        <div class="stat">
+          <dt>Protected CLV (monthly)</dt>
+          <dd class="num">$4.28M</dd>
+          <p>Discounted NPV</p>
+        </div>
+        <div class="stat">
+          <dt>Active critical accounts</dt>
+          <dd class="num text-risk">342</dd>
+          <p>High risk tier</p>
+        </div>
+        <div class="stat">
+          <dt>Model latency</dt>
+          <dd class="num" id="serverLatencyDisplay">14.2ms</dd>
+          <p>XGBoost-v1.08</p>
+        </div>
+      </dl>
+    </section>
+
     <!-- VIEW 1: INTERACTIVE PLATFORM & SIMULATOR (DEFAULT) -->
-    <div id="view-dashboard" class="max-w-[1720px] mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col gap-6 w-full">
+    <div id="view-dashboard" class="container-app py-6 flex-1 flex flex-col gap-6 w-full">
 
       <!-- QUICK PRESET PERSONA SELECTOR BAR -->
-      <section class="glass-card rounded-2xl p-4 border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <section class="panel rounded-sheet p-4 border border-rule flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
-          <div class="p-2 rounded-xl bg-indigo-500/20 text-indigo-300">
-            <i data-lucide="users" class="w-5 h-5"></i>
+          <div class="p-2 rounded-sheet bg-tint-accent text-ink-2">
+            <span data-lucide="users" class="w-5 h-5"></span>
           </div>
           <div>
-            <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-ink flex items-center gap-2">
               Cohort Persona Quick-Loader
-              <span class="text-[11px] font-normal text-slate-400">Select standard benchmark archetypes to test predictive response:</span>
+              <span class="text-xs font-normal text-muted">Select standard benchmark archetypes to test predictive response:</span>
             </h2>
           </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full md:w-auto">
           <!-- Persona A -->
-          <button onclick="applyPersona('high_risk')" id="btn-persona-high_risk" class="group px-3.5 py-2 rounded-xl bg-slate-900/80 hover:bg-rose-950/40 border border-rose-500/30 hover:border-rose-500/60 text-left transition-all flex items-center gap-3">
-            <div class="w-2.5 h-2.5 rounded-full bg-rose-500 group-hover:scale-125 transition-transform"></div>
+          <button onclick="applyPersona('high_risk')" id="btn-persona-high_risk" class="group px-3.5 py-2 rounded-sheet bg-paper-3 hover:bg-tint-risk border border-line-risk hover:border-line-risk text-left transition-colors flex items-center gap-3">
+            <div class="w-2.5 h-2.5 rounded-full bg-risk  transition-transform"></div>
             <div>
               <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-rose-200">Tech Leaver (Critical)</span>
-                <span class="text-[10px] font-mono px-1 bg-rose-500/20 text-rose-300 rounded ml-2">~82% Risk</span>
+                <span class="text-xs font-semibold text-risk">Tech Leaver (Critical)</span>
+                <span class="text-xs px-1 bg-tint-risk text-risk rounded-field ml-2">~82% Risk</span>
               </div>
-              <p class="text-[10px] text-slate-400">Month-to-Month • Fiber Optic • No Tech Supp • $98/mo</p>
+              <p class="text-xs text-muted">Month-to-month, fiber optic, no tech support, $98/mo</p>
             </div>
           </button>
 
           <!-- Persona B -->
-          <button onclick="applyPersona('price_sensitive')" id="btn-persona-price_sensitive" class="group px-3.5 py-2 rounded-xl bg-slate-900/80 hover:bg-amber-950/40 border border-amber-500/30 hover:border-amber-500/60 text-left transition-all flex items-center gap-3">
-            <div class="w-2.5 h-2.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform"></div>
+          <button onclick="applyPersona('price_sensitive')" id="btn-persona-price_sensitive" class="group px-3.5 py-2 rounded-sheet bg-paper-3 hover:bg-tint-caution border border-line-caution hover:border-line-caution text-left transition-colors flex items-center gap-3">
+            <div class="w-2.5 h-2.5 rounded-full bg-caution  transition-transform"></div>
             <div>
               <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-amber-200">Price-Sensitive Streamer</span>
-                <span class="text-[10px] font-mono px-1 bg-amber-500/20 text-amber-300 rounded ml-2">~52% Risk</span>
+                <span class="text-xs font-semibold text-caution">Price-Sensitive Streamer</span>
+                <span class="text-xs px-1 bg-tint-caution text-caution rounded-field ml-2">~52% Risk</span>
               </div>
-              <p class="text-[10px] text-slate-400">1-Year • Multi-Streaming • Elec Check • $78/mo</p>
+              <p class="text-xs text-muted">1-year, multi-streaming, electronic check, $78/mo</p>
             </div>
           </button>
 
           <!-- Persona C -->
-          <button onclick="applyPersona('loyal')" id="btn-persona-loyal" class="group px-3.5 py-2 rounded-xl bg-slate-900/80 hover:bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-500/60 text-left transition-all flex items-center gap-3">
-            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 group-hover:scale-125 transition-transform"></div>
+          <button onclick="applyPersona('loyal')" id="btn-persona-loyal" class="group px-3.5 py-2 rounded-sheet bg-paper-3 hover:bg-tint-ok border border-line-ok hover:border-line-ok text-left transition-colors flex items-center gap-3">
+            <div class="w-2.5 h-2.5 rounded-full bg-ok  transition-transform"></div>
             <div>
               <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-emerald-200">Loyal Long-Tenure User</span>
-                <span class="text-[10px] font-mono px-1 bg-emerald-500/20 text-emerald-300 rounded ml-2">~9% Risk</span>
+                <span class="text-xs font-semibold text-ok">Loyal Long-Tenure User</span>
+                <span class="text-xs px-1 bg-tint-ok text-ok rounded-field ml-2">~9% Risk</span>
               </div>
-              <p class="text-[10px] text-slate-400">2-Year • Full Security • Bank AutoPay • 62 mos</p>
+              <p class="text-xs text-muted">2-year, full security, bank autopay, 62 months</p>
             </div>
           </button>
         </div>
@@ -505,16 +152,16 @@
         <!-- LEFT COLUMN: WHAT-IF SIMULATION INPUT CONTROLS (5 COLS) -->
         <div class="lg:col-span-5 flex flex-col gap-5">
           
-          <div class="glass-card rounded-2xl p-5 border border-white/10">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+          <div class="panel rounded-sheet p-5 border border-rule">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-rule">
               <div class="flex items-center gap-2.5">
-                <div class="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400">
-                  <i data-lucide="sliders" class="w-4 h-4"></i>
+                <div class="p-1.5 rounded-sheet bg-tint-accent text-ink-2">
+                  <span data-lucide="sliders" class="w-4 h-4"></span>
                 </div>
-                <h3 class="text-sm font-bold text-white uppercase tracking-wider">Customer Profile & What-If Simulator</h3>
+                <h3 class="text-sm font-semibold text-ink">Customer Profile & What-If Simulator</h3>
               </div>
-              <span class="text-[11px] font-mono text-indigo-400 flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+              <span class="text-xs text-ink-2 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-board"></span>
                 Live Model Hooked
               </span>
             </div>
@@ -523,22 +170,22 @@
             <form id="simForm" onsubmit="event.preventDefault(); triggerInference();" class="flex flex-col gap-5">
               
               <!-- SECTION 1: ACCOUNT & BILLING -->
-              <div class="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-3.5">
+              <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule space-y-3.5">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold uppercase text-slate-300 flex items-center gap-1.5">
-                    <i data-lucide="credit-card" class="w-3.5 h-3.5 text-indigo-400"></i> Account & Billing Metrics
+                  <span class="text-xs font-semibold text-ink-2 flex items-center gap-1.5">
+                    <span data-lucide="credit-card" class="w-3.5 h-3.5 text-ink-2"></span> Account & Billing Metrics
                   </span>
-                  <span class="text-[10px] text-slate-400">Sliders update real-time</span>
+                  <span class="text-xs text-muted">Sliders update real-time</span>
                 </div>
 
                 <!-- Tenure Slider -->
                 <div>
                   <div class="flex justify-between items-center text-xs mb-1">
-                    <label for="tenureInput" class="text-slate-300 font-medium">Customer Tenure</label>
-                    <span class="font-mono font-bold text-indigo-300 text-sm bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-500/20 tabular-nums" id="tenureValDisplay">6 Months</span>
+                    <label for="tenureInput" class="text-ink-2 font-medium">Customer Tenure</label>
+                    <span class="font-mono font-semibold text-ink-2 text-sm bg-tint-accent px-2 py-1 rounded-field border border-line-accent tabular-nums" id="tenureValDisplay">6 Months</span>
                   </div>
-                  <input type="range" id="tenureInput" min="1" max="72" value="6" step="1" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" oninput="updateFormAndRun()">
-                  <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                  <input type="range" id="tenureInput" min="1" max="72" value="6" step="1" class="w-full h-1.5 bg-paper-3 rounded-sheet cursor-pointer" oninput="updateFormAndRun()">
+                  <div class="flex justify-between text-xs text-muted mt-1">
                     <span>1 mo (Newborn)</span>
                     <span>36 mos (Mid)</span>
                     <span>72 mos (Veteran)</span>
@@ -548,11 +195,11 @@
                 <!-- Monthly Charges Slider -->
                 <div>
                   <div class="flex justify-between items-center text-xs mb-1">
-                    <label for="monthlyChargesInput" class="text-slate-300 font-medium">Monthly Charge ($)</label>
-                    <span class="font-mono font-bold text-indigo-300 text-sm bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-500/20 tabular-nums" id="monthlyChargesValDisplay">$92.50</span>
+                    <label for="monthlyChargesInput" class="text-ink-2 font-medium">Monthly Charge ($)</label>
+                    <span class="font-mono font-semibold text-ink-2 text-sm bg-tint-accent px-2 py-1 rounded-field border border-line-accent tabular-nums" id="monthlyChargesValDisplay">$92.50</span>
                   </div>
-                  <input type="range" id="monthlyChargesInput" min="18" max="120" value="92.5" step="0.5" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" oninput="updateFormAndRun()">
-                  <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                  <input type="range" id="monthlyChargesInput" min="18" max="120" value="92.5" step="0.5" class="w-full h-1.5 bg-paper-3 rounded-sheet cursor-pointer" oninput="updateFormAndRun()">
+                  <div class="flex justify-between text-xs text-muted mt-1">
                     <span>$18.25 (Basic)</span>
                     <span>$65.00</span>
                     <span>$120.00 (Maxed Out)</span>
@@ -560,16 +207,16 @@
                 </div>
 
                 <!-- Calculated Total Charges Indicator -->
-                <div class="flex items-center justify-between text-xs pt-1 border-t border-white/5">
-                  <span class="text-slate-400">Simulated Total Lifetime Spent:</span>
-                  <span id="totalChargesDisplay" class="font-mono font-semibold text-slate-200 tabular-nums">$555.00</span>
+                <div class="flex items-center justify-between text-xs pt-1 border-t border-rule">
+                  <span class="text-muted">Simulated Total Lifetime Spent:</span>
+                  <span id="totalChargesDisplay" class="font-mono font-semibold text-ink tabular-nums">$555.00</span>
                 </div>
 
                 <!-- Payment Method & Paperless Billing -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
-                    <label for="paymentMethodSelect" class="block text-xs font-medium text-slate-300 mb-1">Payment Method</label>
-                    <select id="paymentMethodSelect" onchange="triggerInference()" class="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                    <label for="paymentMethodSelect" class="block text-xs font-medium text-ink-2 mb-1">Payment Method</label>
+                    <select id="paymentMethodSelect" onchange="triggerInference()" class="w-full bg-paper-3 rounded-sheet px-2.5 py-1.5 text-xs text-ink focus:border-line-accent transition-colors">
                       <option value="Electronic check" selected>Electronic check (High Risk)</option>
                       <option value="Mailed check">Mailed check</option>
                       <option value="Bank transfer (automatic)">Bank transfer (Auto-pay)</option>
@@ -578,12 +225,12 @@
                   </div>
 
                   <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Paperless Billing</label>
+                    <label class="block text-xs font-medium text-ink-2 mb-1">Paperless Billing</label>
                     <div class="flex items-center h-8">
                       <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="paperlessBillingCheck" checked class="sr-only peer" onchange="triggerInference()">
-                        <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                        <span id="paperlessText" class="ml-2.5 text-xs font-medium text-slate-300">Enabled</span>
+                        <div class="w-9 h-5 bg-rule-2 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-cotton after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-cotton after:border-rule after:border after:rounded-full after:h-4 after:w-4 after:transition-colors peer-checked:bg-board"></div>
+                        <span id="paperlessText" class="ml-2.5 text-xs font-medium text-ink-2">Enabled</span>
                       </label>
                     </div>
                   </div>
@@ -592,43 +239,43 @@
               </div>
 
               <!-- SECTION 2: CONTRACT & LINE INFO -->
-              <div class="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-3">
-                <span class="text-xs font-bold uppercase text-slate-300 flex items-center gap-1.5">
-                  <i data-lucide="file-signature" class="w-3.5 h-3.5 text-cyan-400"></i> Contract & Line Architecture
+              <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule space-y-3">
+                <span class="text-xs font-semibold text-ink-2 flex items-center gap-1.5">
+                  <span data-lucide="file-signature" class="w-3.5 h-3.5 text-ink-2"></span> Contract & Line Architecture
                 </span>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <label class="contract-card cursor-pointer border border-indigo-500/40 bg-indigo-950/30 p-2 rounded-lg text-center transition-all hover:border-indigo-400">
+                  <label class="contract-option cursor-pointer border border-line-accent bg-tint-accent p-2 rounded-sheet text-center transition-colors hover:border-line-accent">
                     <input type="radio" name="contractType" value="Month-to-month" checked class="sr-only" onchange="highlightContractCard(); triggerInference()">
-                    <span class="block text-[11px] font-semibold text-white">Month-to-Month</span>
-                    <span class="block text-[9px] text-rose-400 font-mono">High Churn Driver</span>
+                    <span class="block text-xs font-semibold text-ink">Month-to-Month</span>
+                    <span class="block text-xs text-risk">High Churn Driver</span>
                   </label>
 
-                  <label class="contract-card cursor-pointer border border-white/10 bg-slate-950/40 p-2 rounded-lg text-center transition-all hover:border-indigo-400">
+                  <label class="contract-option cursor-pointer border border-rule bg-paper-3 p-2 rounded-sheet text-center transition-colors hover:border-line-accent">
                     <input type="radio" name="contractType" value="One year" class="sr-only" onchange="highlightContractCard(); triggerInference()">
-                    <span class="block text-[11px] font-semibold text-slate-300">One Year</span>
-                    <span class="block text-[9px] text-amber-400 font-mono">Moderate Stability</span>
+                    <span class="block text-xs font-semibold text-ink-2">One Year</span>
+                    <span class="block text-xs text-caution">Moderate Stability</span>
                   </label>
 
-                  <label class="contract-card cursor-pointer border border-white/10 bg-slate-950/40 p-2 rounded-lg text-center transition-all hover:border-indigo-400">
+                  <label class="contract-option cursor-pointer border border-rule bg-paper-3 p-2 rounded-sheet text-center transition-colors hover:border-line-accent">
                     <input type="radio" name="contractType" value="Two year" class="sr-only" onchange="highlightContractCard(); triggerInference()">
-                    <span class="block text-[11px] font-semibold text-slate-300">Two Year</span>
-                    <span class="block text-[9px] text-emerald-400 font-mono">Protective Anchor</span>
+                    <span class="block text-xs font-semibold text-ink-2">Two Year</span>
+                    <span class="block text-xs text-ok">Protective Anchor</span>
                   </label>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-1">
                   <div>
-                    <label for="internetServiceSelect" class="block text-xs font-medium text-slate-300 mb-1">Internet Backbone</label>
-                    <select id="internetServiceSelect" onchange="toggleInternetServices(); triggerInference();" class="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                    <label for="internetServiceSelect" class="block text-xs font-medium text-ink-2 mb-1">Internet Backbone</label>
+                    <select id="internetServiceSelect" onchange="toggleInternetServices(); triggerInference();" class="w-full bg-paper-3 rounded-sheet px-2.5 py-1.5 text-xs text-ink focus:border-line-accent transition-colors">
                       <option value="Fiber optic" selected>Fiber Optic (Fast, High Price)</option>
                       <option value="DSL">DSL (Legacy Copper)</option>
                       <option value="No">No Internet Service</option>
                     </select>
                   </div>
                   <div>
-                    <label for="multipleLinesSelect" class="block text-xs font-medium text-slate-300 mb-1">Voice Lines</label>
-                    <select id="multipleLinesSelect" onchange="triggerInference()" class="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                    <label for="multipleLinesSelect" class="block text-xs font-medium text-ink-2 mb-1">Voice Lines</label>
+                    <select id="multipleLinesSelect" onchange="triggerInference()" class="w-full bg-paper-3 rounded-sheet px-2.5 py-1.5 text-xs text-ink focus:border-line-accent transition-colors">
                       <option value="Yes">Multiple Lines (Bundled)</option>
                       <option value="No" selected>Single Line Only</option>
                       <option value="No phone service">No Phone Service</option>
@@ -638,57 +285,57 @@
               </div>
 
               <!-- SECTION 3: VALUE ADDED SERVICES & STICKINESS PACKAGES -->
-              <div class="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-3" id="vasContainer">
+              <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule space-y-3" id="vasContainer">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold uppercase text-slate-300 flex items-center gap-1.5">
-                    <i data-lucide="shield" class="w-3.5 h-3.5 text-emerald-400"></i> Value-Added Services (Churn Mitigators)
+                  <span class="text-xs font-semibold text-ink-2 flex items-center gap-1.5">
+                    <span data-lucide="shield" class="w-3.5 h-3.5 text-ok"></span> Value-Added Services (Churn Mitigators)
                   </span>
-                  <span class="text-[10px] text-emerald-400 font-mono">Each add-on dampens risk</span>
+                  <span class="text-xs text-ok">Each add-on dampens risk</span>
                 </div>
 
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                   <!-- Online Security -->
-                  <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/70 border border-white/5 cursor-pointer hover:border-emerald-500/40 transition-colors">
-                    <input type="checkbox" id="vasSecurity" class="rounded bg-slate-800 border-white/10 text-indigo-600 focus:ring-0" onchange="triggerInference()">
-                    <span class="text-slate-300 text-[11px]">Online Security</span>
+                  <label class="flex items-center gap-2 p-2 rounded-sheet bg-paper-3 border border-rule cursor-pointer hover:border-line-ok transition-colors">
+                    <input type="checkbox" id="vasSecurity" class="rounded-field bg-paper-3 border-rule text-ink-2 focus:ring-0" onchange="triggerInference()">
+                    <span class="text-ink-2 text-xs">Online Security</span>
                   </label>
 
                   <!-- Tech Support -->
-                  <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/70 border border-white/5 cursor-pointer hover:border-emerald-500/40 transition-colors">
-                    <input type="checkbox" id="vasTechSupport" class="rounded bg-slate-800 border-white/10 text-indigo-600 focus:ring-0" onchange="triggerInference()">
-                    <span class="text-slate-300 text-[11px]">Tech Support</span>
+                  <label class="flex items-center gap-2 p-2 rounded-sheet bg-paper-3 border border-rule cursor-pointer hover:border-line-ok transition-colors">
+                    <input type="checkbox" id="vasTechSupport" class="rounded-field bg-paper-3 border-rule text-ink-2 focus:ring-0" onchange="triggerInference()">
+                    <span class="text-ink-2 text-xs">Tech Support</span>
                   </label>
 
                   <!-- Device Protection -->
-                  <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/70 border border-white/5 cursor-pointer hover:border-emerald-500/40 transition-colors">
-                    <input type="checkbox" id="vasDeviceProtection" class="rounded bg-slate-800 border-white/10 text-indigo-600 focus:ring-0" onchange="triggerInference()">
-                    <span class="text-slate-300 text-[11px]">Device Protection</span>
+                  <label class="flex items-center gap-2 p-2 rounded-sheet bg-paper-3 border border-rule cursor-pointer hover:border-line-ok transition-colors">
+                    <input type="checkbox" id="vasDeviceProtection" class="rounded-field bg-paper-3 border-rule text-ink-2 focus:ring-0" onchange="triggerInference()">
+                    <span class="text-ink-2 text-xs">Device Protection</span>
                   </label>
 
                   <!-- Online Backup -->
-                  <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/70 border border-white/5 cursor-pointer hover:border-emerald-500/40 transition-colors">
-                    <input type="checkbox" id="vasBackup" class="rounded bg-slate-800 border-white/10 text-indigo-600 focus:ring-0" onchange="triggerInference()">
-                    <span class="text-slate-300 text-[11px]">Online Backup</span>
+                  <label class="flex items-center gap-2 p-2 rounded-sheet bg-paper-3 border border-rule cursor-pointer hover:border-line-ok transition-colors">
+                    <input type="checkbox" id="vasBackup" class="rounded-field bg-paper-3 border-rule text-ink-2 focus:ring-0" onchange="triggerInference()">
+                    <span class="text-ink-2 text-xs">Online Backup</span>
                   </label>
 
                   <!-- Streaming TV -->
-                  <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/70 border border-white/5 cursor-pointer hover:border-indigo-500/40 transition-colors">
-                    <input type="checkbox" id="vasStreamingTV" checked class="rounded bg-slate-800 border-white/10 text-indigo-600 focus:ring-0" onchange="triggerInference()">
-                    <span class="text-slate-300 text-[11px]">Streaming TV</span>
+                  <label class="flex items-center gap-2 p-2 rounded-sheet bg-paper-3 border border-rule cursor-pointer hover:border-line-accent transition-colors">
+                    <input type="checkbox" id="vasStreamingTV" checked class="rounded-field bg-paper-3 border-rule text-ink-2 focus:ring-0" onchange="triggerInference()">
+                    <span class="text-ink-2 text-xs">Streaming TV</span>
                   </label>
 
                   <!-- Streaming Movies -->
-                  <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-950/70 border border-white/5 cursor-pointer hover:border-indigo-500/40 transition-colors">
-                    <input type="checkbox" id="vasStreamingMovies" checked class="rounded bg-slate-800 border-white/10 text-indigo-600 focus:ring-0" onchange="triggerInference()">
-                    <span class="text-slate-300 text-[11px]">Streaming Movies</span>
+                  <label class="flex items-center gap-2 p-2 rounded-sheet bg-paper-3 border border-rule cursor-pointer hover:border-line-accent transition-colors">
+                    <input type="checkbox" id="vasStreamingMovies" checked class="rounded-field bg-paper-3 border-rule text-ink-2 focus:ring-0" onchange="triggerInference()">
+                    <span class="text-ink-2 text-xs">Streaming Movies</span>
                   </label>
                 </div>
               </div>
 
               <!-- Simulation Run Button -->
               <div class="flex items-center gap-3 pt-1">
-                <button type="button" onclick="runSimulatedInference()" id="btnRunInference" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-semibold text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-[0.99]">
-                  <i data-lucide="cpu" class="w-4 h-4"></i>
+                <button type="button" onclick="runSimulatedInference()" id="btnRunInference" class="whitespace-nowrap flex-1 py-3 rounded-sheet font-semibold text-xs flex items-center justify-center gap-2 transition-colors active:scale-[0.99] bg-board text-board-type">
+                  <span data-lucide="cpu" class="w-4 h-4"></span>
                   <span>Re-Compute AI Inference & SHAP</span>
                 </button>
               </div>
@@ -697,14 +344,14 @@
           </div>
 
           <!-- Customer Identity Card Mini Badge -->
-          <div class="glass-card rounded-xl p-3 border border-white/5 flex items-center justify-between text-xs text-slate-400">
+          <div class="panel rounded-sheet p-3 border border-rule flex items-center justify-between text-xs text-muted">
             <div class="flex items-center gap-2">
-              <i data-lucide="fingerprint" class="w-4 h-4 text-indigo-400"></i>
-              <span>Customer ID: <strong class="text-slate-200 font-mono" id="customerHashId">TELCO-8841-BXV</strong></span>
+              <span data-lucide="fingerprint" class="w-4 h-4 text-ink-2"></span>
+              <span>Customer ID: <strong class="text-ink" id="customerHashId">TELCO-8841-BXV</strong></span>
             </div>
             <div class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span class="text-slate-300 text-[11px]">Billing: Current</span>
+              <span class="w-2 h-2 rounded-full bg-ok"></span>
+              <span class="text-ink-2 text-xs">Billing: Current</span>
             </div>
           </div>
 
@@ -717,34 +364,32 @@
           <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
             
             <!-- CHURN RISK PROBABILITY GAUGE (5 COLS) -->
-            <div id="riskGaugeContainer" class="md:col-span-5 glass-card rounded-2xl p-5 border border-white/10 flex flex-col items-center justify-center text-center transition-all duration-500 relative overflow-hidden">
-              <div class="absolute top-3 left-4 flex items-center gap-2">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">AI Risk Verdict</span>
-                <span id="recalcSpinner" class="inline-flex items-center gap-1 text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 opacity-0 transition-opacity duration-150">
-                  <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Live Calc
-                </span>
-              </div>
-              <div class="absolute top-3 right-4">
-                <span id="riskVerdictBadge" class="px-2.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-red-500/25 text-red-300 border-2 border-red-500 transition-all duration-300">
+            <div id="riskGaugeContainer" class="md:col-span-5 panel rounded-sheet p-5 border border-rule flex flex-col items-center justify-center text-center transition-colors duration-500 relative overflow-hidden">
+              <div class="w-full flex items-center justify-between gap-2 mb-2">
+                <span class="flex items-center gap-2"><span class="text-xs font-semibold text-muted">AI risk verdict</span>
+                <span id="recalcSpinner" class="inline-flex items-center gap-1 text-xs text-ink-2 bg-tint-accent px-2 py-1 rounded-field border border-line-accent opacity-0 transition-opacity duration-150">
+                  <span data-lucide="loader-2" class="w-3 h-3 animate-spin"></span> Live Calc
+                </span></span>
+                <span id="riskVerdictBadge" class="px-2.5 py-1 rounded-field text-xs font-semibold bg-tint-risk text-risk border-2 border-line-risk transition-colors duration-300">
                   Critical
                 </span>
               </div>
 
               <!-- SVG Radial Gauge -->
-              <div class="relative w-44 h-44 mt-4 flex items-center justify-center">
-                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+              <div class="relative w-44 h-44 flex items-center justify-center">
+                <svg aria-hidden="true" class="w-full h-full -rotate-90" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="48" fill="transparent" stroke-width="10" class="radial-meter-bg"></circle>
-                  <circle id="radialMeterIndicator" cx="60" cy="60" r="48" fill="transparent" stroke-width="10" stroke="#f43f5e" stroke-linecap="round" stroke-dasharray="301.59" stroke-dashoffset="60" class="radial-meter-indicator"></circle>
+                  <circle id="radialMeterIndicator" cx="60" cy="60" r="48" fill="transparent" stroke-width="10" stroke="var(--color-risk)" stroke-linecap="round" stroke-dasharray="301.59" stroke-dashoffset="60" class="radial-meter-indicator"></circle>
                 </svg>
                 <div class="absolute flex flex-col items-center justify-center">
-                  <span id="churnProbNumber" class="text-4xl font-extrabold font-mono tracking-tight text-white tabular-nums">78%</span>
-                  <span class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mt-0.5">Churn Probability</span>
+                  <span id="churnProbNumber" class="text-4xl font-semibold font-mono text-ink tabular-nums">78%</span>
+                  <span class="text-xs text-muted font-semibold mt-0.5">Churn Probability</span>
                 </div>
               </div>
 
               <!-- Status subtext -->
-              <div class="mt-2 text-xs text-slate-300 font-medium text-center">
-                <span id="riskSummaryText">Extremely elevated likelihood of contract termination within 60 days.</span>
+              <div class="mt-2 text-xs text-ink-2 font-medium text-center">
+                <span id="riskSummaryText">Very high likelihood of contract termination within 60 days.</span>
               </div>
             </div>
 
@@ -752,69 +397,69 @@
             <div class="md:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               
               <!-- Baseline vs Preserved CLV Card -->
-              <div class="glass-card rounded-2xl p-4 border border-white/10 flex flex-col justify-between">
+              <div class="panel rounded-sheet p-4 border border-rule flex flex-col justify-between">
                 <div>
-                  <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
-                    <span class="font-medium uppercase tracking-wider text-[10px]">Projected Lifetime Value</span>
-                    <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-400"></i>
+                  <div class="flex items-center justify-between text-muted text-xs mb-1">
+                    <span class="font-medium text-xs">Projected Lifetime Value</span>
+                    <span data-lucide="dollar-sign" class="w-4 h-4 text-ok"></span>
                   </div>
-                  <div class="text-2xl font-bold font-mono text-emerald-400 mt-1 tabular-nums" id="projectedCLVDisplay">
+                  <div class="text-2xl font-semibold font-mono text-ok mt-1 tabular-nums" id="projectedCLVDisplay">
                     $1,850.00
                   </div>
-                  <p class="text-[11px] text-slate-400 mt-1">Based on retention model discounting</p>
+                  <p class="text-xs text-muted mt-1">Based on retention model discounting</p>
                 </div>
                 
-                <div class="pt-3 mt-3 border-t border-white/5 space-y-1 text-xs">
-                  <div class="flex justify-between text-slate-400">
+                <div class="pt-3 mt-3 border-t border-rule space-y-1 text-xs">
+                  <div class="flex justify-between text-muted">
                     <span>Expected Remaining:</span>
-                    <span class="text-white font-mono font-semibold tabular-nums" id="remainingTenureDisplay">18 Months</span>
+                    <span class="text-ink font-semibold tabular-nums" id="remainingTenureDisplay">18 Months</span>
                   </div>
-                  <div class="flex justify-between text-slate-400">
+                  <div class="flex justify-between text-muted">
                     <span>Lifetime Margin:</span>
-                    <span class="text-emerald-400 font-mono font-medium">+68.5%</span>
+                    <span class="text-ok font-medium">+68.5%</span>
                   </div>
                 </div>
               </div>
 
               <!-- Immediate Revenue at Risk Card -->
-              <div class="glass-card rounded-2xl p-4 border border-white/10 flex flex-col justify-between">
+              <div class="panel rounded-sheet p-4 border border-rule flex flex-col justify-between">
                 <div>
-                  <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
-                    <span class="font-medium uppercase tracking-wider text-[10px]">Annual Revenue at Risk</span>
-                    <i data-lucide="trending-down" class="w-4 h-4 text-rose-400"></i>
+                  <div class="flex items-center justify-between text-muted text-xs mb-1">
+                    <span class="font-medium text-xs">Annual Revenue at Risk</span>
+                    <span data-lucide="trending-down" class="w-4 h-4 text-risk"></span>
                   </div>
-                  <div class="text-2xl font-bold font-mono text-rose-400 mt-1 tabular-nums" id="annualRevAtRiskDisplay">
+                  <div class="text-2xl font-semibold font-mono text-risk mt-1 tabular-nums" id="annualRevAtRiskDisplay">
                     $1,110.00
                   </div>
-                  <p class="text-[11px] text-slate-400 mt-1">Annualized gross run-rate if lost</p>
+                  <p class="text-xs text-muted mt-1">Annualized gross run-rate if lost</p>
                 </div>
 
-                <div class="pt-3 mt-3 border-t border-white/5 space-y-1 text-xs">
-                  <div class="flex justify-between text-slate-400">
+                <div class="pt-3 mt-3 border-t border-rule space-y-1 text-xs">
+                  <div class="flex justify-between text-muted">
                     <span>Acquisition Replacement:</span>
-                    <span class="text-slate-300 font-mono font-medium">~$380 CAC</span>
+                    <span class="text-ink-2 font-medium">~$380 CAC</span>
                   </div>
-                  <div class="flex justify-between text-slate-400">
+                  <div class="flex justify-between text-muted">
                     <span>Priority Tier:</span>
-                    <span class="text-rose-400 font-mono font-semibold" id="priorityTierDisplay">Tier 1 - Immediate</span>
+                    <span class="text-risk font-semibold" id="priorityTierDisplay">Tier 1 - Immediate</span>
                   </div>
                 </div>
               </div>
 
               <!-- Compact Intervention Confidence Matrix Banner -->
-              <div class="sm:col-span-2 rounded-xl p-3 bg-gradient-to-r from-indigo-950/60 to-slate-900 border border-indigo-500/20 flex items-center justify-between">
+              <div class="sm:col-span-2 rounded-sheet p-3 border border-line-accent flex items-center justify-between bg-paper-2">
                 <div class="flex items-center gap-3">
-                  <div class="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
-                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                  <div class="p-2 rounded-sheet bg-tint-accent text-ink-2">
+                    <span data-lucide="sparkles" class="w-4 h-4"></span>
                   </div>
                   <div>
-                    <span class="text-xs font-semibold text-white">Recommended Strategy:</span>
-                    <p class="text-[11px] text-indigo-300" id="recommendedHeroStrategy">Annualized Loyalty Retention Bundle + Free Tech Support</p>
+                    <span class="text-xs font-semibold text-ink">Recommended Strategy:</span>
+                    <p class="text-xs text-ink-2" id="recommendedHeroStrategy">Annualized Loyalty Retention Bundle + Free Tech Support</p>
                   </div>
                 </div>
                 <div class="text-right">
-                  <span class="text-[10px] text-slate-400 block uppercase font-mono">Net Retrievable CLV</span>
-                  <span class="text-sm font-mono font-bold text-emerald-400 tabular-nums" id="retrievableCLVAmount">+$1,240</span>
+                  <span class="text-xs text-muted block">Net Retrievable CLV</span>
+                  <span class="text-sm font-mono font-semibold text-ok tabular-nums" id="retrievableCLVAmount">+$1,240</span>
                 </div>
               </div>
 
@@ -823,34 +468,34 @@
           </div>
 
           <!-- SHAP FEATURE ATTRIBUTION EXPLAINABILITY PANEL -->
-          <div class="glass-card rounded-2xl p-5 border border-white/10">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-white/10 gap-2">
+          <div class="panel rounded-sheet p-5 border border-rule">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-rule gap-2">
               <div class="flex items-center gap-2">
-                <div class="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400">
-                  <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+                <div class="p-1.5 rounded-sheet bg-paper-3 text-ink-2">
+                  <span data-lucide="bar-chart-2" class="w-4 h-4"></span>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <h3 class="text-sm font-semibold text-ink flex items-center gap-2">
                     SHAP Model Explainability
-                    <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30">Local Feature Attributions</span>
-                    <span id="shapRecalcSpinner" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30 opacity-0 transition-opacity duration-150 flex items-center gap-1">
-                      <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Live SHAP
+                    <span class="text-xs font-normal px-2 py-1 rounded-field bg-paper-3 text-ink-2 border border-rule">Local Feature Attributions</span>
+                    <span id="shapRecalcSpinner" class="text-xs px-2 py-1 rounded-field bg-paper-3 text-ink-2 border border-rule opacity-0 transition-opacity duration-150 flex items-center gap-1">
+                      <span data-lucide="loader-2" class="w-3 h-3 animate-spin"></span> Live SHAP
                     </span>
                   </h3>
                 </div>
               </div>
-              <div class="flex items-center gap-3 text-[11px]">
-                <span class="flex items-center gap-1.5 text-rose-400">
-                  <span class="w-2.5 h-2.5 rounded bg-rose-500"></span> Positive (+Churn Risk)
+              <div class="flex items-center gap-3 text-xs">
+                <span class="flex items-center gap-1.5 text-risk">
+                  <span class="w-2.5 h-2.5 rounded-field bg-risk"></span> Positive (+Churn Risk)
                 </span>
-                <span class="flex items-center gap-1.5 text-emerald-400">
-                  <span class="w-2.5 h-2.5 rounded bg-emerald-500"></span> Negative (-Churn Risk)
+                <span class="flex items-center gap-1.5 text-ok">
+                  <span class="w-2.5 h-2.5 rounded-field bg-ok"></span> Negative (-Churn Risk)
                 </span>
               </div>
             </div>
 
-            <p class="text-xs text-slate-400 mb-4">
-              Additive SHAP impact scores decompose the model's prediction baseline (+0.26 avg) for this specific customer profile:
+            <p class="text-xs text-muted mb-4">
+              Additive SHAP impact scores decompose the model’s prediction baseline (+0.26 avg) for this specific customer profile:
             </p>
 
             <!-- Dynamic Horizontal Bar Chart Container -->
@@ -859,8 +504,8 @@
             </div>
 
             <!-- Explainability Narrative Note -->
-            <div class="mt-4 p-3 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-300 flex items-start gap-2.5">
-              <i data-lucide="info" class="w-4 h-4 text-indigo-400 shrink-0 mt-0.5"></i>
+            <div class="mt-4 p-3 rounded-sheet bg-paper-3 border border-rule text-xs text-ink-2 flex items-start gap-2.5">
+              <span data-lucide="info" class="w-4 h-4 text-ink-2 shrink-0 mt-0.5"></span>
               <span id="shapNarrative">
                 The predominant risk vectors are the <strong>Month-to-Month Contract</strong> and lack of <strong>Tech Support</strong> on a high-tier Fiber Optic connection. Adding proactive service support drastically dampens risk.
               </span>
@@ -868,48 +513,48 @@
           </div>
 
           <!-- AUTOMATED AI RETENTION PLAYBOOK & ACTION ENGINE -->
-          <div class="glass-card rounded-2xl p-5 border border-white/10">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+          <div class="panel rounded-sheet p-5 border border-rule">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-rule">
               <div class="flex items-center gap-2">
-                <div class="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                  <i data-lucide="crosshair" class="w-4 h-4"></i>
+                <div class="p-1.5 rounded-sheet bg-tint-ok text-ok">
+                  <span data-lucide="crosshair" class="w-4 h-4"></span>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white uppercase tracking-wider">
+                  <h3 class="text-sm font-semibold text-ink">
                     Automated Retention Playbook
                   </h3>
                 </div>
               </div>
-              <span class="text-xs text-slate-400 font-mono">Ranked by Algorithmic ROI</span>
+              <span class="text-xs text-muted">Ranked by Algorithmic ROI</span>
             </div>
 
             <!-- Retention Strategy Cards Stack -->
             <div class="space-y-3" id="retentionPlaysContainer">
               
               <!-- Play 1 (Primary Recommended) -->
-              <div class="p-4 rounded-xl bg-gradient-to-r from-indigo-950/40 via-slate-900/80 to-slate-900 border border-indigo-500/40 hover:border-indigo-400 transition-all">
+              <div class="p-4 rounded-sheet border border-line-accent hover:border-line-accent transition-colors bg-paper-2">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div class="space-y-1">
                     <div class="flex items-center gap-2">
-                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500 text-white uppercase">Primary Target</span>
-                      <h4 class="text-sm font-bold text-white">12-Month Loyalty Contract Discount + Free Tech Support</h4>
+                      <span class="px-2 py-1 rounded-field text-xs font-semibold bg-board text-ink">Primary Target</span>
+                      <h4 class="text-sm font-semibold text-ink">12-Month Loyalty Contract Discount + Free Tech Support</h4>
                     </div>
-                    <p class="text-xs text-slate-400">Offer 15% discount for 6 months on contract renewal and activate Tech Support tier for free.</p>
+                    <p class="text-xs text-muted">Offer 15% discount for 6 months on contract renewal and activate Tech Support tier for free.</p>
                   </div>
                   <div class="text-right shrink-0">
-                    <span class="text-xs text-emerald-400 font-mono font-bold block">Risk Reduction: 78% → 32% (-46%)</span>
-                    <span class="text-[11px] text-slate-400">Net Expected ROI: <strong>$890.00 Saved</strong></span>
+                    <span class="text-xs text-ok font-semibold block">Risk Reduction: 78% → 32% (-46%)</span>
+                    <span class="text-xs text-muted">Net Expected ROI: <strong>$890.00 Saved</strong></span>
                   </div>
                 </div>
 
-                <div class="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-                  <div class="flex items-center gap-2 text-xs text-indigo-300">
-                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-rule">
+                  <div class="flex items-center gap-2 text-xs text-ink-2">
+                    <span data-lucide="check-circle-2" class="w-3.5 h-3.5 text-ok"></span>
                     <span>Pre-approved by Finance Automation</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button onclick="applyInterventionSimulation(0.32)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/30">
-                      <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                    <button onclick="applyInterventionSimulation(0.32)" class="px-3 py-1.5 rounded-sheet bg-board hover:bg-board text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                      <span data-lucide="zap" class="w-3.5 h-3.5"></span>
                       <span>Deploy Offer Instantly</span>
                     </button>
                   </div>
@@ -917,56 +562,56 @@
               </div>
 
               <!-- Play 2 -->
-              <div class="p-4 rounded-xl bg-slate-900/50 border border-white/5 hover:border-white/20 transition-all">
+              <div class="p-4 rounded-sheet bg-paper-3 border border-rule hover:border-rule transition-colors">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div class="space-y-1">
                     <div class="flex items-center gap-2">
-                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 uppercase">Alternative 2</span>
-                      <h4 class="text-sm font-semibold text-slate-200">Switch Payment to Auto-Pay with $10 Bill Credit</h4>
+                      <span class="px-2 py-1 rounded-field text-xs font-semibold bg-paper-3 text-ink-2">Alternative 2</span>
+                      <h4 class="text-sm font-semibold text-ink">Switch Payment to Auto-Pay with $10 Bill Credit</h4>
                     </div>
-                    <p class="text-xs text-slate-400">Incentivize migration from Electronic Check to Bank Direct Debit to remove friction point.</p>
+                    <p class="text-xs text-muted">Incentivize migration from Electronic Check to Bank Direct Debit to remove friction point.</p>
                   </div>
                   <div class="text-right shrink-0">
-                    <span class="text-xs text-emerald-400 font-mono font-bold block">Risk Reduction: 78% → 58% (-20%)</span>
-                    <span class="text-[11px] text-slate-400">Net Expected ROI: <strong>$320.00 Saved</strong></span>
+                    <span class="text-xs text-ok font-semibold block">Risk Reduction: 78% → 58% (-20%)</span>
+                    <span class="text-xs text-muted">Net Expected ROI: <strong>$320.00 Saved</strong></span>
                   </div>
                 </div>
 
-                <div class="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-                  <div class="flex items-center gap-2 text-xs text-slate-400">
-                    <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-rule">
+                  <div class="flex items-center gap-2 text-xs text-muted">
+                    <span data-lucide="clock" class="w-3.5 h-3.5"></span>
                     <span>Self-service portal trigger email</span>
                   </div>
-                  <button onclick="applyInterventionSimulation(0.58)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                  <button onclick="applyInterventionSimulation(0.58)" class="px-3 py-1.5 rounded-sheet bg-paper-3 hover:bg-paper-3 text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                    <span data-lucide="send" class="w-3.5 h-3.5"></span>
                     <span>Queue Email Push</span>
                   </button>
                 </div>
               </div>
 
               <!-- Play 3 -->
-              <div class="p-4 rounded-xl bg-slate-900/50 border border-white/5 hover:border-white/20 transition-all">
+              <div class="p-4 rounded-sheet bg-paper-3 border border-rule hover:border-rule transition-colors">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div class="space-y-1">
                     <div class="flex items-center gap-2">
-                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 uppercase">Outbound Care</span>
-                      <h4 class="text-sm font-semibold text-slate-200">VIP Customer Success Concierge Outreach Call</h4>
+                      <span class="px-2 py-1 rounded-field text-xs font-semibold bg-paper-3 text-ink-2">Outbound Care</span>
+                      <h4 class="text-sm font-semibold text-ink">VIP Customer Success Concierge Outreach Call</h4>
                     </div>
-                    <p class="text-xs text-slate-400">Assign account to senior retention representative for bespoke network speed diagnosis.</p>
+                    <p class="text-xs text-muted">Assign account to senior retention representative for bespoke network speed diagnosis.</p>
                   </div>
                   <div class="text-right shrink-0">
-                    <span class="text-xs text-emerald-400 font-mono font-bold block">Resolution Rate: 65%</span>
-                    <span class="text-[11px] text-slate-400">SLA: <strong>&lt; 4 Hours</strong></span>
+                    <span class="text-xs text-ok font-semibold block">Resolution Rate: 65%</span>
+                    <span class="text-xs text-muted">SLA: <strong>&lt; 4 Hours</strong></span>
                   </div>
                 </div>
 
-                <div class="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-                  <div class="flex items-center gap-2 text-xs text-slate-400">
-                    <i data-lucide="phone-call" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-rule">
+                  <div class="flex items-center gap-2 text-xs text-muted">
+                    <span data-lucide="phone-call" class="w-3.5 h-3.5 text-ink-2"></span>
                     <span>Direct CRM Routing to Tier 3 Specialist</span>
                   </div>
-                  <button onclick="scheduleVIPCallModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-                    <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                  <button onclick="scheduleVIPCallModal()" class="px-3 py-1.5 rounded-sheet bg-paper-3 hover:bg-paper-3 text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                    <span data-lucide="calendar" class="w-3.5 h-3.5"></span>
                     <span>Schedule Call</span>
                   </button>
                 </div>
@@ -982,31 +627,31 @@
     </div>
 
     <!-- VIEW 2: VISUALIZED RETENTION MEASURES & SURVIVAL LAB -->
-    <div id="view-visualizer" class="hidden max-w-[1720px] mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col gap-6 w-full">
+    <div id="view-visualizer" class="hidden container-app py-6 flex-1 flex flex-col gap-6 w-full">
       
       <!-- HERO BANNER -->
-      <div class="glass-card rounded-2xl p-6 border border-emerald-500/30 bg-gradient-to-r from-slate-900 via-emerald-950/30 to-slate-900 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div class="panel rounded-sheet p-6 border border-line-ok flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-paper-2">
         <div>
           <div class="flex items-center gap-2 mb-2">
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Interactive Counterfactual Lab
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-tint-ok text-ok border border-line-ok flex items-center gap-1.5">
+              <span data-lucide="sparkles" class="w-3.5 h-3.5"></span> Interactive Counterfactual Lab
             </span>
-            <span class="text-xs text-slate-400">Visualizing Churn Reduction Interventions</span>
+            <span class="text-xs text-muted">Visualizing Churn Reduction Interventions</span>
           </div>
-          <h2 class="text-2xl font-extrabold text-white tracking-tight">
+          <h2 class="text-2xl font-semibold text-ink">
             Retention Measures & Survival Lift Visualizer
           </h2>
-          <p class="text-xs text-slate-300 max-w-3xl leading-relaxed mt-1">
+          <p class="text-xs text-ink-2 max-w-3xl leading-relaxed mt-1">
             Toggle specific business intervention levers below to see real-time graphical shifts in <strong>Kaplan-Meier Survival Curves $S(t)$</strong>, <strong>Step-by-Step Waterfall Risk Mitigation</strong>, and <strong>Net Financial ROI</strong>.
           </p>
         </div>
 
         <div class="flex items-center gap-3 shrink-0">
-          <button onclick="applyAllMeasures()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all">
-            <i data-lucide="check-check" class="w-4 h-4"></i>
+          <button onclick="applyAllMeasures()" class="px-4 py-2.5 rounded-sheet font-semibold text-xs flex items-center gap-2 transition-colors bg-board text-board-type">
+            <span data-lucide="check-check" class="w-4 h-4"></span>
             <span>Enable Max Retention Bundle</span>
           </button>
-          <button onclick="resetMeasures()" class="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-white/10 transition-all">
+          <button onclick="resetMeasures()" class="px-3 py-2.5 rounded-sheet bg-paper-3 hover:bg-paper-3 text-ink-2 text-xs font-medium border border-rule transition-colors">
             <span>Reset Levers</span>
           </button>
         </div>
@@ -1017,92 +662,92 @@
 
         <!-- LEFT COLUMN: INTERVENTION LEVERS (4 COLS) -->
         <div class="lg:col-span-4 flex flex-col gap-4">
-          <div class="glass-card rounded-2xl p-5 border border-white/10">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
-                <i data-lucide="sliders" class="w-4 h-4 text-emerald-400"></i> Active Retention Levers
+          <div class="panel rounded-sheet p-5 border border-rule">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-rule">
+              <span class="text-xs font-semibold text-ink flex items-center gap-2">
+                <span data-lucide="sliders" class="w-4 h-4 text-ok"></span> Active Retention Levers
               </span>
-              <span class="text-[10px] text-emerald-400 font-mono">Live Toggle</span>
+              <span class="text-xs text-ok">Live Toggle</span>
             </div>
 
             <!-- Levers Stack -->
             <div class="space-y-3">
               
               <!-- Lever 1: Contract Upgrade -->
-              <label class="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 hover:border-emerald-500/40 cursor-pointer transition-all flex items-start gap-3 block">
-                <input type="checkbox" id="leverContract" checked class="mt-1 rounded bg-slate-800 border-white/20 text-emerald-500 focus:ring-0" onchange="updateVisualizerCharts()">
+              <label class="p-3.5 rounded-sheet bg-paper-3 border border-rule hover:border-line-ok cursor-pointer transition-colors flex items-start gap-3 block">
+                <input type="checkbox" id="leverContract" checked class="mt-1 rounded-field bg-paper-3 border-rule text-ok focus:ring-0" onchange="updateVisualizerCharts()">
                 <div class="flex-1">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-white">1. Contract Lock Upgrade</span>
-                    <span class="text-[10px] font-mono font-bold text-emerald-400 px-1.5 py-0.2 bg-emerald-500/10 rounded">-32% Risk</span>
+                    <span class="text-xs font-semibold text-ink">1. Contract Lock Upgrade</span>
+                    <span class="text-xs font-semibold text-ok px-1.5 py-1 bg-tint-ok rounded-field">-32% Risk</span>
                   </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5">Switch Month-to-Month to 1-Year Commitment with 10% rate lock guarantee.</p>
+                  <p class="text-xs text-muted mt-0.5">Switch Month-to-Month to 1-Year Commitment with 10% rate lock guarantee.</p>
                 </div>
               </label>
 
               <!-- Lever 2: Tech Support & Security Bundle -->
-              <label class="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 hover:border-emerald-500/40 cursor-pointer transition-all flex items-start gap-3 block">
-                <input type="checkbox" id="leverTechSupport" checked class="mt-1 rounded bg-slate-800 border-white/20 text-emerald-500 focus:ring-0" onchange="updateVisualizerCharts()">
+              <label class="p-3.5 rounded-sheet bg-paper-3 border border-rule hover:border-line-ok cursor-pointer transition-colors flex items-start gap-3 block">
+                <input type="checkbox" id="leverTechSupport" checked class="mt-1 rounded-field bg-paper-3 border-rule text-ok focus:ring-0" onchange="updateVisualizerCharts()">
                 <div class="flex-1">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-white">2. Free Tech Support & Cyber Bundle</span>
-                    <span class="text-[10px] font-mono font-bold text-emerald-400 px-1.5 py-0.2 bg-emerald-500/10 rounded">-16% Risk</span>
+                    <span class="text-xs font-semibold text-ink">2. Free Tech Support & Cyber Bundle</span>
+                    <span class="text-xs font-semibold text-ok px-1.5 py-1 bg-tint-ok rounded-field">-16% Risk</span>
                   </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5">Complementary 6-month proactive cyber security & 24/7 priority technician routing.</p>
+                  <p class="text-xs text-muted mt-0.5">Complementary 6-month proactive cyber security & 24/7 priority technician routing.</p>
                 </div>
-              </div>
+              
               </label>
 
               <!-- Lever 3: Payment Auto-Pay Migration -->
-              <label class="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 hover:border-emerald-500/40 cursor-pointer transition-all flex items-start gap-3 block">
-                <input type="checkbox" id="leverAutoPay" checked class="mt-1 rounded bg-slate-800 border-white/20 text-emerald-500 focus:ring-0" onchange="updateVisualizerCharts()">
+              <label class="p-3.5 rounded-sheet bg-paper-3 border border-rule hover:border-line-ok cursor-pointer transition-colors flex items-start gap-3 block">
+                <input type="checkbox" id="leverAutoPay" checked class="mt-1 rounded-field bg-paper-3 border-rule text-ok focus:ring-0" onchange="updateVisualizerCharts()">
                 <div class="flex-1">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-white">3. Auto-Pay Migration ($10 Bill Credit)</span>
-                    <span class="text-[10px] font-mono font-bold text-emerald-400 px-1.5 py-0.2 bg-emerald-500/10 rounded">-12% Risk</span>
+                    <span class="text-xs font-semibold text-ink">3. Auto-Pay Migration ($10 Bill Credit)</span>
+                    <span class="text-xs font-semibold text-ok px-1.5 py-1 bg-tint-ok rounded-field">-12% Risk</span>
                   </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5">Migrate manual Electronic Check to automated Bank Direct Debit to remove billing friction.</p>
+                  <p class="text-xs text-muted mt-0.5">Migrate manual Electronic Check to automated Bank Direct Debit to remove billing friction.</p>
                 </div>
               </label>
 
               <!-- Lever 4: Loyalty Rate Rebate -->
-              <label class="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 hover:border-emerald-500/40 cursor-pointer transition-all flex items-start gap-3 block">
-                <input type="checkbox" id="leverRateRebate" class="mt-1 rounded bg-slate-800 border-white/20 text-emerald-500 focus:ring-0" onchange="updateVisualizerCharts()">
+              <label class="p-3.5 rounded-sheet bg-paper-3 border border-rule hover:border-line-ok cursor-pointer transition-colors flex items-start gap-3 block">
+                <input type="checkbox" id="leverRateRebate" class="mt-1 rounded-field bg-paper-3 border-rule text-ok focus:ring-0" onchange="updateVisualizerCharts()">
                 <div class="flex-1">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-white">4. 15% Strategic Fiber Discount</span>
-                    <span class="text-[10px] font-mono font-bold text-emerald-400 px-1.5 py-0.2 bg-emerald-500/10 rounded">-9% Risk</span>
+                    <span class="text-xs font-semibold text-ink">4. 15% Strategic Fiber Discount</span>
+                    <span class="text-xs font-semibold text-ok px-1.5 py-1 bg-tint-ok rounded-field">-9% Risk</span>
                   </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5">Right-size high-charge subscribers ($90+/mo) with 6-month loyalty billing relief.</p>
+                  <p class="text-xs text-muted mt-0.5">Right-size high-charge subscribers ($90+/mo) with 6-month loyalty billing relief.</p>
                 </div>
               </label>
 
             </div>
 
             <!-- Sync Button -->
-            <button onclick="syncMeasuresToSimulator()" class="w-full mt-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <button onclick="syncMeasuresToSimulator()" class="w-full mt-4 py-2.5 rounded-sheet bg-board hover:bg-board text-ink font-semibold text-xs flex items-center justify-center gap-2 transition-colors">
+              <span data-lucide="refresh-cw" class="w-3.5 h-3.5"></span>
               <span>Sync Active Levers to Live Simulator</span>
             </button>
           </div>
 
           <!-- Quick Telemetry Summary Card -->
-          <div class="glass-card rounded-2xl p-4 border border-white/10 space-y-3">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Simulated Net Impact</span>
+          <div class="panel rounded-sheet p-4 border border-rule space-y-3">
+            <span class="text-xs font-semibold text-muted block">Simulated Net Impact</span>
             
-            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/70 border border-white/5">
-              <span class="text-xs text-slate-300">Baseline Churn Risk:</span>
-              <span class="text-sm font-mono font-bold text-rose-400 tabular-nums" id="vizBaseRisk">78.0%</span>
+            <div class="flex items-center justify-between p-2.5 rounded-sheet bg-paper-3 border border-rule">
+              <span class="text-xs text-ink-2">Baseline Churn Risk:</span>
+              <span class="text-sm font-mono font-semibold text-risk tabular-nums" id="vizBaseRisk">78.0%</span>
             </div>
 
-            <div class="flex items-center justify-between p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30">
-              <span class="text-xs text-emerald-200">Mitigated Churn Risk:</span>
-              <span class="text-lg font-mono font-bold text-emerald-400 tabular-nums" id="vizMitigatedRisk">18.0%</span>
+            <div class="flex items-center justify-between p-2.5 rounded-sheet bg-tint-ok border border-line-ok">
+              <span class="text-xs text-ok">Mitigated Churn Risk:</span>
+              <span class="text-lg font-mono font-semibold text-ok tabular-nums" id="vizMitigatedRisk">18.0%</span>
             </div>
 
-            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/70 border border-white/5">
-              <span class="text-xs text-slate-300">Net Expected Lifetime Gained:</span>
-              <span class="text-sm font-mono font-bold text-indigo-300 tabular-nums" id="vizLifetimeGained">+28.5 Months</span>
+            <div class="flex items-center justify-between p-2.5 rounded-sheet bg-paper-3 border border-rule">
+              <span class="text-xs text-ink-2">Net Expected Lifetime Gained:</span>
+              <span class="text-sm font-semibold text-ink-2 tabular-nums" id="vizLifetimeGained">+28.5 Months</span>
             </div>
           </div>
         </div>
@@ -1111,38 +756,38 @@
         <div class="lg:col-span-8 flex flex-col gap-6">
           
           <!-- CHART 1: DYNAMIC KAPLAN-MEIER SURVIVAL CURVE SHIFT -->
-          <div class="glass-card rounded-2xl p-5 border border-white/10">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-white/10 gap-2">
+          <div class="panel rounded-sheet p-5 border border-rule">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-rule gap-2">
               <div class="flex items-center gap-2">
-                <div class="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                  <i data-lucide="line-chart" class="w-4 h-4"></i>
+                <div class="p-1.5 rounded-sheet bg-tint-ok text-ok">
+                  <span data-lucide="line-chart" class="w-4 h-4"></span>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white uppercase tracking-wider">
+                  <h3 class="text-sm font-semibold text-ink">
                     Kaplan-Meier Survival Curve Shift: $S(t)$ Before vs. After
                   </h3>
-                  <p class="text-[11px] text-slate-400">Survival probability $S(t) = P(T > t)$ across 72 customer tenure months</p>
+                  <p class="text-xs text-muted">Survival probability $S(t) = P(T > t)$ across 72 customer tenure months</p>
                 </div>
               </div>
 
               <div class="flex items-center gap-4 text-xs">
-                <span class="flex items-center gap-1.5 text-rose-400 font-medium">
-                  <span class="w-3 h-1 bg-rose-500 rounded"></span> Baseline (High Hazard)
+                <span class="flex items-center gap-1.5 text-risk font-medium">
+                  <span class="w-3 h-1 bg-risk rounded-field"></span> Baseline (High Hazard)
                 </span>
-                <span class="flex items-center gap-1.5 text-emerald-400 font-bold">
-                  <span class="w-3 h-1 bg-emerald-400 rounded"></span> Mitigated (+Interventions)
+                <span class="flex items-center gap-1.5 text-ok font-semibold">
+                  <span class="w-3 h-1 bg-ok rounded-field"></span> Mitigated (+Interventions)
                 </span>
               </div>
             </div>
 
             <!-- Canvas Container -->
             <div class="w-full h-72">
-              <canvas id="survivalShiftChart"></canvas>
+              <canvas id="survivalShiftChart" role="img" aria-label="Survival curves: baseline against retention measures applied"></canvas>
             </div>
 
-            <div class="mt-3 text-xs text-slate-400 flex items-center justify-between pt-3 border-t border-white/5">
+            <div class="mt-3 text-xs text-muted flex items-center justify-between pt-3 border-t border-rule">
               <span>Shaded area highlights the <strong>Retained Customer Equity Window</strong>.</span>
-              <span class="text-emerald-400 font-mono font-semibold" id="survivalAreaGainedText">+480 Integral Months</span>
+              <span class="text-ok font-semibold" id="survivalAreaGainedText">+480 Integral Months</span>
             </div>
           </div>
 
@@ -1150,83 +795,83 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
             <!-- CHART 2: STEP-BY-STEP WATERFALL RISK REDUCTION -->
-            <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
+            <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between">
               <div>
-                <div class="flex items-center justify-between pb-2 mb-3 border-b border-white/10">
-                  <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <i data-lucide="bar-chart" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <div class="flex items-center justify-between pb-2 mb-3 border-b border-rule">
+                  <h3 class="text-xs font-semibold text-ink flex items-center gap-1.5">
+                    <span data-lucide="bar-chart" class="w-3.5 h-3.5 text-ink-2"></span>
                     Waterfall Churn Reduction
                   </h3>
-                  <span class="text-[10px] text-cyan-300 font-mono">Additive Levers</span>
+                  <span class="text-xs text-ink-2">Additive Levers</span>
                 </div>
                 <div class="w-full h-56">
-                  <canvas id="waterfallReductionChart"></canvas>
+                  <canvas id="waterfallReductionChart" role="img" aria-label="Waterfall of churn risk reduced by each active retention lever"></canvas>
                 </div>
               </div>
-              <p class="text-[11px] text-slate-400 mt-2">
+              <p class="text-xs text-muted mt-2">
                 Demonstrates how targeted measures sequentially peel risk away from the initial hazard point.
               </p>
             </div>
 
             <!-- CHART 3: FINANCIAL ROI & VALUE AT RISK BALANCE -->
-            <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
+            <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between">
               <div>
-                <div class="flex items-center justify-between pb-2 mb-3 border-b border-white/10">
-                  <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <div class="flex items-center justify-between pb-2 mb-3 border-b border-rule">
+                  <h3 class="text-xs font-semibold text-ink flex items-center gap-1.5">
+                    <span data-lucide="pie-chart" class="w-3.5 h-3.5 text-ink-2"></span>
                     Cost vs. Preserved CLV ($)
                   </h3>
-                  <span class="text-[10px] text-emerald-400 font-mono font-bold" id="vizRoiBadge">+1,850% ROI</span>
+                  <span class="text-xs text-ok font-semibold" id="vizRoiBadge">+1,850% ROI</span>
                 </div>
                 <div class="w-full h-56">
-                  <canvas id="financialRoiChart"></canvas>
+                  <canvas id="financialRoiChart" role="img" aria-label="Retention spend against revenue retained"></canvas>
                 </div>
               </div>
-              <div class="flex items-center justify-between text-xs pt-2 border-t border-white/5 mt-2">
-                <span class="text-slate-400">Net Retained Profit:</span>
-                <span class="text-emerald-400 font-mono font-bold text-sm tabular-nums" id="vizNetProfitDisplay">+$1,420.00</span>
+              <div class="flex items-center justify-between text-xs pt-2 border-t border-rule mt-2">
+                <span class="text-muted">Net Retained Profit:</span>
+                <span class="text-ok font-mono font-semibold text-sm tabular-nums" id="vizNetProfitDisplay">+$1,420.00</span>
               </div>
           </div>
-
+          </div>
           <!-- CHART 4: PORTFOLIO RISK PROBABILITY DISTRIBUTION & HIGH-CONTRAST PALETTE -->
-          <div class="glass-card rounded-2xl p-5 border border-white/10 mt-6">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-white/10 gap-2">
+          <div class="panel rounded-sheet p-5 border border-rule mt-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-rule gap-2">
               <div class="flex items-center gap-2">
-                <div class="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400">
-                  <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                <div class="p-1.5 rounded-sheet bg-tint-accent text-ink-2">
+                  <span data-lucide="bar-chart-3" class="w-4 h-4"></span>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <h3 class="text-sm font-semibold text-ink flex items-center gap-2">
                     Portfolio Churn Probability Distribution & Risk Tiers
-                    <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/10 font-mono">7,043 Customers</span>
+                    <span class="text-xs font-normal px-2 py-1 rounded-field bg-paper-3 text-ink-2 border border-rule">7,043 Customers</span>
                   </h3>
-                  <p class="text-[11px] text-slate-400">Auditorium high-contrast view across calibrated risk brackets with live customer overlay</p>
+                  <p class="text-xs text-muted">Auditorium high-contrast view across calibrated risk brackets with live customer overlay</p>
                 </div>
               </div>
               <div class="flex items-center gap-3 text-xs">
-                <span class="flex items-center gap-1.5 text-emerald-400 font-medium">
-                  <span class="w-3 h-3 rounded bg-emerald-500"></span> Retained (&lt;45%)
+                <span class="flex items-center gap-1.5 text-ok font-medium">
+                  <span class="w-3 h-3 rounded-field bg-ok"></span> Retained (&lt;45%)
                 </span>
-                <span class="flex items-center gap-1.5 text-amber-400 font-medium">
-                  <span class="w-3 h-3 rounded bg-amber-500"></span> Moderate (45-79%)
+                <span class="flex items-center gap-1.5 text-caution font-medium">
+                  <span class="w-3 h-3 rounded-field bg-caution"></span> Moderate (45-79%)
                 </span>
-                <span class="flex items-center gap-1.5 text-red-400 font-bold">
-                  <span class="w-3 h-3 rounded bg-red-500"></span> Critical (≥80%)
+                <span class="flex items-center gap-1.5 text-risk font-semibold">
+                  <span class="w-3 h-3 rounded-field bg-risk"></span> Critical (≥80%)
                 </span>
               </div>
             </div>
 
             <div class="w-full h-56">
-              <canvas id="probabilityDistributionChart"></canvas>
+              <canvas id="probabilityDistributionChart" role="img" aria-label="Distribution of churn probability across customers, with this customer marked"></canvas>
             </div>
 
-            <div class="mt-3 text-xs text-slate-400 flex flex-wrap items-center justify-between pt-3 border-t border-white/5 gap-2">
+            <div class="mt-3 text-xs text-muted flex flex-wrap items-center justify-between pt-3 border-t border-rule gap-2">
               <div class="flex items-center gap-2">
-                <span class="text-slate-300 font-medium">Active Evaluated Account:</span>
-                <span id="distCustomerMarker" class="px-2 py-0.5 rounded font-mono text-[11px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">78.0% Probability (Critical Zone)</span>
+                <span class="text-ink-2 font-medium">Active Evaluated Account:</span>
+                <span id="distCustomerMarker" class="px-2 py-1 rounded-field text-xs bg-tint-accent text-ink-2 border border-line-accent">78.0% Probability (Critical Zone)</span>
               </div>
-              <div class="text-slate-400 font-mono text-[11px]">
-                High-Contrast Projector Palette: Red (#EF4444) | Amber (#F59E0B) | Emerald (#10B981)
+              <div class="text-muted text-xs">
+                High-contrast status palette: risk | caution | ok
               </div>
             </div>
           </div>
@@ -1238,34 +883,34 @@
     </div>
 
     <!-- VIEW 3: ACADEMIC ML CONCEPTS & TEACHER DEFENSE HUB -->
-    <div id="view-concepts" class="hidden max-w-[1720px] mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col gap-6 w-full">
+    <div id="view-concepts" class="hidden container-app py-6 flex-1 flex flex-col gap-6 w-full">
       
       <!-- HEADER BANNER FOR ACADEMIC HUB -->
-      <div class="glass-card rounded-2xl p-6 border border-amber-500/30 relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900">
+      <div class="panel rounded-sheet p-6 border border-line-caution relative overflow-hidden bg-paper-2">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="space-y-2">
             <div class="flex items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
-                <i data-lucide="award" class="w-3.5 h-3.5"></i> Academic Project Defense Guide
+              <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-tint-caution text-caution border border-line-caution flex items-center gap-1.5">
+                <span data-lucide="award" class="w-3.5 h-3.5"></span> Academic Project Defense Guide
               </span>
-              <span class="text-xs text-slate-400">IBM Telco Customer Churn & CLV Intelligence System</span>
+              <span class="text-xs text-muted">IBM Telco Customer Churn & CLV Intelligence System</span>
             </div>
-            <h2 class="text-2xl font-extrabold text-white tracking-tight">
+            <h2 class="text-2xl font-semibold text-ink">
               Machine Learning Concepts, Math & Engineering Pipeline
             </h2>
-            <p class="text-xs text-slate-300 max-w-4xl leading-relaxed">
+            <p class="text-xs text-ink-2 max-w-4xl leading-relaxed">
               This interactive defense hub details every theoretical principle, mathematical equation, data leakage prevention protocol, machine learning algorithm, survival analysis model, and business optimization strategy implemented throughout the 9 Jupyter notebooks and production codebase.
             </p>
           </div>
           
           <div class="flex items-center gap-3 shrink-0">
-            <div class="p-3 rounded-xl bg-slate-950/80 border border-white/10 text-center">
-              <span class="text-[10px] uppercase font-bold text-slate-400 block">Total Pipeline Notebooks</span>
-              <span class="text-lg font-mono font-bold text-amber-300">01 → 09</span>
+            <div class="p-3 rounded-sheet bg-paper-3 border border-rule text-center">
+              <span class="text-xs font-semibold text-muted block">Total Pipeline Notebooks</span>
+              <span class="text-lg font-semibold text-caution">01 → 09</span>
             </div>
-            <div class="p-3 rounded-xl bg-slate-950/80 border border-white/10 text-center">
-              <span class="text-[10px] uppercase font-bold text-slate-400 block">Dataset Records</span>
-              <span class="text-lg font-mono font-bold text-indigo-300">7,043</span>
+            <div class="p-3 rounded-sheet bg-paper-3 border border-rule text-center">
+              <span class="text-xs font-semibold text-muted block">Dataset Records</span>
+              <span class="text-lg font-semibold text-ink-2">7,043</span>
             </div>
           </div>
         </div>
@@ -1275,330 +920,330 @@
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
         <!-- CONCEPT CARD 1: DATA INGESTION & LEAKAGE SAFEGUARDS -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-indigo-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="database" class="w-4 h-4"></i> 1. Ingestion & Preprocessing
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-ink-2 flex items-center gap-1.5">
+                <span data-lucide="database" class="w-4 h-4"></span> 1. Ingestion & Preprocessing
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">01_loading & 03_prep</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">01_loading & 03_prep</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">Zero Data-Leakage Protocol</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
+            <h3 class="text-base font-semibold text-ink mb-2">Zero Data-Leakage Protocol</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
               Standard flaw in student ML projects: applying imputation or scaling on the full dataset before splitting. Our pipeline enforces strict segregation:
             </p>
-            <ul class="space-y-2 text-xs text-slate-400 list-disc list-inside">
-              <li><strong class="text-slate-200">Stratified Train/Test Split (80/20):</strong> Preserves original target ratio (26.54% churn) across folds.</li>
-              <li><strong class="text-slate-200">Whitespace & Type Coercion:</strong> Coerces 11 empty space string values in <code class="font-mono text-indigo-300">TotalCharges</code> to NaN.</li>
-              <li><strong class="text-slate-200">Train-Fitted Median Imputation:</strong> <code class="font-mono text-indigo-300">SimpleImputer(strategy='median')</code> fits on <code class="font-mono text-indigo-300">X_train</code> ONLY, preventing test set leakage.</li>
-              <li><strong class="text-slate-200">One-Hot Encoding with Dummy Trap Prevention:</strong> Encodes categorical variables using <code class="font-mono text-indigo-300">drop_first=True</code> ($k-1$ dummies).</li>
-              <li><strong class="text-slate-200">Z-Score Standard Scaling:</strong> <code class="font-mono text-indigo-300">StandardScaler()</code> scales features based exclusively on training distribution ($\mu_{\text{train}}, \sigma_{\text{train}}$).</li>
+            <ul class="space-y-2 text-xs text-muted list-disc list-inside">
+              <li><strong class="text-ink">Stratified Train/Test Split (80/20):</strong> Preserves original target ratio (26.54% churn) across folds.</li>
+              <li><strong class="text-ink">Whitespace & Type Coercion:</strong> Coerces 11 empty space string values in <code class="text-ink-2">TotalCharges</code> to NaN.</li>
+              <li><strong class="text-ink">Train-Fitted Median Imputation:</strong> <code class="text-ink-2">SimpleImputer(strategy='median')</code> fits on <code class="text-ink-2">X_train</code> ONLY, preventing test set leakage.</li>
+              <li><strong class="text-ink">One-Hot Encoding with Dummy Trap Prevention:</strong> Encodes categorical variables using <code class="text-ink-2">drop_first=True</code> ($k-1$ dummies).</li>
+              <li><strong class="text-ink">Z-Score Standard Scaling:</strong> <code class="text-ink-2">StandardScaler()</code> scales features based exclusively on training distribution ($\mu_{\text{train}}, \sigma_{\text{train}}$).</li>
             </ul>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-indigo-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-ink-2">
             <span>Reference: src/preprocessing.py</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 2: CLASS IMBALANCE & SAMPLING -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-rose-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="scale" class="w-4 h-4"></i> 2. Class Imbalance Handling
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-risk flex items-center gap-1.5">
+                <span data-lucide="scale" class="w-4 h-4"></span> 2. Class Imbalance Handling
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">04_churn_models</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">04_churn_models</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">Imbalanced Learning & Resampling</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
+            <h3 class="text-base font-semibold text-ink mb-2">Imbalanced Learning & Resampling</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
               The dataset contains 73.4% Retained vs. 26.6% Churn (2.76:1 ratio). Naive accuracy is misleading (73% by predicting zero):
             </p>
-            <ul class="space-y-2 text-xs text-slate-400 list-disc list-inside">
-              <li><strong class="text-slate-200">SMOTE (Synthetic Minority Over-sampling):</strong> Synthesizes minority samples along $k$-nearest neighbor vectors in feature space.</li>
-              <li><strong class="text-slate-200">Algorithm Class Weighting:</strong> Leverages <code class="font-mono text-indigo-300">scale_pos_weight = (N_{neg} / N_{pos}) \approx 2.76</code> in XGBoost to penalize false negatives.</li>
-              <li><strong class="text-slate-200">Stratified $K$-Fold Cross Validation:</strong> 5-fold stratification ensures balanced validation splits for hyperparameter tuning.</li>
-              <li><strong class="text-slate-200">Evaluation Metrics Focus:</strong> Prioritizes <strong>PR-AUC, ROC-AUC (0.854), and Recall (0.81)</strong> over pure accuracy.</li>
+            <ul class="space-y-2 text-xs text-muted list-disc list-inside">
+              <li><strong class="text-ink">SMOTE (Synthetic Minority Over-sampling):</strong> Synthesizes minority samples along $k$-nearest neighbor vectors in feature space.</li>
+              <li><strong class="text-ink">Algorithm Class Weighting:</strong> Leverages <code class="text-ink-2">scale_pos_weight = (N_{neg} / N_{pos}) \approx 2.76</code> in XGBoost to penalize false negatives.</li>
+              <li><strong class="text-ink">Stratified $K$-Fold Cross Validation:</strong> 5-fold stratification ensures balanced validation splits for hyperparameter tuning.</li>
+              <li><strong class="text-ink">Evaluation Metrics Focus:</strong> Prioritizes <strong>PR-AUC, ROC-AUC (0.854), and Recall (0.81)</strong> over pure accuracy.</li>
             </ul>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-rose-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-risk">
             <span>Recall Target: &gt; 80% Churn Capture</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 3: 5-MODEL BENCHMARKING & TOURNAMENT -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="trophy" class="w-4 h-4"></i> 3. Model Benchmark Tournament
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-ink-2 flex items-center gap-1.5">
+                <span data-lucide="trophy" class="w-4 h-4"></span> 3. Model Benchmark Tournament
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">04 & 05 Notebooks</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">04 & 05 Notebooks</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">5 Classifiers Compared & Evaluated</h3>
+            <h3 class="text-base font-semibold text-ink mb-2">5 Classifiers Compared & Evaluated</h3>
             <div class="overflow-x-auto my-2">
-              <table class="w-full text-[11px] text-left border-collapse">
+              <table class="w-full text-xs text-left border-collapse">
                 <thead>
-                  <tr class="border-b border-white/10 text-slate-400">
+                  <tr class="border-b border-rule text-muted">
                     <th class="py-1">Model</th>
-                    <th class="py-1 font-mono">Recall</th>
-                    <th class="py-1 font-mono">F1</th>
-                    <th class="py-1 font-mono text-cyan-300">AUC-ROC</th>
+                    <th class="py-1">Recall</th>
+                    <th class="py-1">F1</th>
+                    <th class="py-1 text-ink-2">AUC-ROC</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-white/5 text-slate-300 font-mono">
+                <tbody class="divide-y divide-rule text-ink-2">
                   <tr>
-                    <td class="py-1 text-slate-400">Logistic Reg.</td>
+                    <td class="py-1 text-muted">Logistic Reg.</td>
                     <td class="py-1">0.78</td>
                     <td class="py-1">0.62</td>
                     <td class="py-1">0.842</td>
                   </tr>
                   <tr>
-                    <td class="py-1 text-slate-400">Random Forest</td>
+                    <td class="py-1 text-muted">Random Forest</td>
                     <td class="py-1">0.69</td>
                     <td class="py-1">0.60</td>
                     <td class="py-1">0.835</td>
                   </tr>
                   <tr>
-                    <td class="py-1 text-slate-400">SVM (RBF)</td>
+                    <td class="py-1 text-muted">SVM (RBF)</td>
                     <td class="py-1">0.71</td>
                     <td class="py-1">0.59</td>
                     <td class="py-1">0.828</td>
                   </tr>
                   <tr>
-                    <td class="py-1 text-slate-400">LightGBM</td>
+                    <td class="py-1 text-muted">LightGBM</td>
                     <td class="py-1">0.79</td>
                     <td class="py-1">0.64</td>
                     <td class="py-1">0.849</td>
                   </tr>
-                  <tr class="bg-indigo-950/60 font-bold text-emerald-300">
-                    <td class="py-1">🏆 XGBoost Champion</td>
+                  <tr class="bg-tint-accent font-semibold text-ok">
+                    <td class="py-1">XGBoost (champion)</td>
                     <td class="py-1">0.81</td>
                     <td class="py-1">0.65</td>
-                    <td class="py-1 text-emerald-400">0.854</td>
+                    <td class="py-1 text-ok">0.854</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p class="text-[11px] text-slate-400">
+            <p class="text-xs text-muted">
               XGBoost with tree-depth tuning, shrinkage ($\eta=0.05$), and L2 regularization ($\lambda$) outperformed all baselines.
             </p>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-cyan-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-ink-2">
             <span>Champion Model: models/xgb_churn.pkl</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 4: SHAP EXPLAINABILITY & GAME THEORY -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="sparkles" class="w-4 h-4"></i> 4. Explainable AI (XAI)
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-caution flex items-center gap-1.5">
+                <span data-lucide="sparkles" class="w-4 h-4"></span> 4. Explainable AI (XAI)
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">06_explainability</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">06_explainability</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">SHAP (Shapley Additive exPlanations)</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
-              Moving beyond "black box" machine learning to explain both global feature importance and local single-customer decisions using cooperative game theory:
+            <h3 class="text-base font-semibold text-ink mb-2">SHAP (Shapley Additive exPlanations)</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
+              Moving beyond “black box” machine learning to explain both global feature importance and local single-customer decisions using cooperative game theory:
             </p>
-            <div class="p-2.5 rounded-lg bg-slate-950 border border-white/5 font-mono text-[10px] text-amber-300 mb-3 overflow-x-auto">
+            <div class="p-2.5 rounded-sheet bg-paper-3 border border-rule text-xs text-caution mb-3 overflow-x-auto">
               \phi_i = \sum_{S \subseteq F \setminus \{i\}} \frac{|S|!(|F|-|S|-1)!}{|F|!} [f(S \cup \{i\}) - f(S)]
             </div>
-            <ul class="space-y-1.5 text-xs text-slate-400 list-disc list-inside">
-              <li><strong class="text-slate-200">Local Waterfall Plots:</strong> Decomposes log-odds prediction into additive contributions for each individual subscriber.</li>
-              <li><strong class="text-slate-200">Global Feature Importance:</strong> Uncovers that Contract Type, Tenure, and Tech Support dominate churn probability across the whole population.</li>
+            <ul class="space-y-1.5 text-xs text-muted list-disc list-inside">
+              <li><strong class="text-ink">Local Waterfall Plots:</strong> Decomposes log-odds prediction into additive contributions for each individual subscriber.</li>
+              <li><strong class="text-ink">Global Feature Importance:</strong> Uncovers that Contract Type, Tenure, and Tech Support dominate churn probability across the whole population.</li>
             </ul>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-amber-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-caution">
             <span>Reference: src/explainability.py</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 5: FINANCIAL CLV & DCF FORMULAS -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="dollar-sign" class="w-4 h-4"></i> 5. CLV & Discounted Cash Flow
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-ok flex items-center gap-1.5">
+                <span data-lucide="dollar-sign" class="w-4 h-4"></span> 5. CLV & Discounted Cash Flow
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">07_clv_simple</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">07_clv_simple</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">Customer Lifetime Value (CLV) Math</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
+            <h3 class="text-base font-semibold text-ink mb-2">Customer Lifetime Value (CLV) Math</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
               Converts pure ML classification probabilities into actionable balance-sheet financial assets via Discounted Cash Flow (DCF):
             </p>
-            <div class="p-2.5 rounded-lg bg-slate-950 border border-white/5 font-mono text-[10px] text-emerald-300 mb-3 overflow-x-auto">
+            <div class="p-2.5 rounded-sheet bg-paper-3 border border-rule text-xs text-ok mb-3 overflow-x-auto">
               CLV = \sum_{m=1}^{T_{\text{rem}}} \frac{\text{MonthlyCharges} \times \text{Margin}}{(1 + r_{\text{month}})^m}
             </div>
-            <ul class="space-y-1.5 text-xs text-slate-400 list-disc list-inside">
-              <li><strong class="text-slate-200">Gross Margin ($\gamma$):</strong> Fixed at 40% based on telecom telecom infrastructure operating expenses.</li>
-              <li><strong class="text-slate-200">Discount Rate ($r$):</strong> Annual cost of capital $10\%$ ($\approx 1\%$ monthly compounding).</li>
-              <li><strong class="text-slate-200">Expected Remaining Horizon:</strong> $T_{\text{rem}} = \frac{1 - P_{\text{churn}}}{P_{\text{churn}}} \times \kappa$.</li>
+            <ul class="space-y-1.5 text-xs text-muted list-disc list-inside">
+              <li><strong class="text-ink">Gross Margin ($\gamma$):</strong> Fixed at 40% based on telecom telecom infrastructure operating expenses.</li>
+              <li><strong class="text-ink">Discount Rate ($r$):</strong> Annual cost of capital $10\%$ ($\approx 1\%$ monthly compounding).</li>
+              <li><strong class="text-ink">Expected Remaining Horizon:</strong> $T_{\text{rem}} = \frac{1 - P_{\text{churn}}}{P_{\text{churn}}} \times \kappa$.</li>
             </ul>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-emerald-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-ok">
             <span>Reference: src/clv.py</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 6: SURVIVAL ANALYSIS & HAZARD MODELING -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-violet-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="trending-up" class="w-4 h-4"></i> 6. Survival Analysis
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-ink-2 flex items-center gap-1.5">
+                <span data-lucide="trending-up" class="w-4 h-4"></span> 6. Survival Analysis
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">08_clv_survival</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">08_clv_survival</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">Kaplan-Meier & Cox Proportional Hazards</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
-              Standard classification treats tenure as static. Survival analysis accounts for <strong>right-censoring</strong> (customers who haven't churned yet):
+            <h3 class="text-base font-semibold text-ink mb-2">Kaplan-Meier & Cox Proportional Hazards</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
+              Standard classification treats tenure as static. Survival analysis accounts for <strong>right-censoring</strong> (customers who haven’t churned yet):
             </p>
-            <div class="p-2.5 rounded-lg bg-slate-950 border border-white/5 font-mono text-[10px] text-violet-300 mb-3 overflow-x-auto">
+            <div class="p-2.5 rounded-sheet bg-paper-3 border border-rule text-xs text-ink-2 mb-3 overflow-x-auto">
               h(t | X) = h_0(t) \exp\left( \sum_{j=1}^p \beta_j X_j \right), \quad S(t) = \prod_{t_i \le t} \left( 1 - \frac{d_i}{n_i} \right)
             </div>
-            <ul class="space-y-1.5 text-xs text-slate-400 list-disc list-inside">
-              <li><strong class="text-slate-200">Hazard Ratio ($e^{\beta}$):</strong> Quantifies multiplier on instantaneous churn risk for Fiber Optic vs. DSL.</li>
-              <li><strong class="text-slate-200">Survival Curve Integration:</strong> Integrates area under the curve to yield true expected lifetime in months.</li>
+            <ul class="space-y-1.5 text-xs text-muted list-disc list-inside">
+              <li><strong class="text-ink">Hazard Ratio ($e^{\beta}$):</strong> Quantifies multiplier on instantaneous churn risk for Fiber Optic vs. DSL.</li>
+              <li><strong class="text-ink">Survival Curve Integration:</strong> Integrates area under the curve to yield true expected lifetime in months.</li>
             </ul>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-violet-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-ink-2">
             <span>Tool: lifelines library</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 7: COST-SENSITIVE THRESHOLD OPTIMIZATION -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-rose-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="sliders" class="w-4 h-4"></i> 7. Cost-Sensitive Tuning
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-risk flex items-center gap-1.5">
+                <span data-lucide="sliders" class="w-4 h-4"></span> 7. Cost-Sensitive Tuning
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">05_tuning</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">05_tuning</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">Cost-Matrix Optimal Thresholds</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
+            <h3 class="text-base font-semibold text-ink mb-2">Cost-Matrix Optimal Thresholds</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
               Standard 0.5 decision threshold is economically sub-optimal because asymmetric error costs exist in real business:
             </p>
-            <div class="grid grid-cols-2 gap-2 my-2 text-[11px] font-mono">
-              <div class="p-2 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300">
-                <span class="block text-[9px] uppercase text-slate-400">Cost False Negative</span>
+            <div class="grid grid-cols-2 gap-2 my-2 text-xs">
+              <div class="p-2 rounded-field bg-tint-risk border border-line-risk text-risk">
+                <span class="block text-xs text-muted">Cost False Negative</span>
                 $500 (Lost Customer)
               </div>
-              <div class="p-2 rounded bg-amber-950/40 border border-amber-500/30 text-amber-300">
-                <span class="block text-[9px] uppercase text-slate-400">Cost False Positive</span>
+              <div class="p-2 rounded-field bg-tint-caution border border-line-caution text-caution">
+                <span class="block text-xs text-muted">Cost False Positive</span>
                 $50 (Wasted Voucher)
               </div>
             </div>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-muted">
               By sweeping decision thresholds from 0.05 to 0.95, the <strong>optimal profit-maximizing threshold was found at $P_{\text{thresh}} = 0.32$</strong> instead of default 0.50.
             </p>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-rose-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-risk">
             <span>Optimal Cutoff: 0.32</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 8: UNSUPERVISED CUSTOMER SEGMENTATION -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-blue-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="pie-chart" class="w-4 h-4"></i> 8. Customer Segmentation (Clustering)
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-ink-2 flex items-center gap-1.5">
+                <span data-lucide="pie-chart" class="w-4 h-4"></span> 8. Customer Segmentation (Clustering)
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">09_segmentation</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">09_segmentation</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">Unsupervised $K$-Means & PCA</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
+            <h3 class="text-base font-semibold text-ink mb-2">Unsupervised $K$-Means & PCA</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
               Unsupervised clustering partitions the 7,043 customer base into actionable behavioral cohorts:
             </p>
-            <ul class="space-y-1.5 text-xs text-slate-400 list-disc list-inside">
-              <li><strong class="text-slate-200">Elbow Curve & Silhouette Scoring:</strong> Identified optimal cluster count $k=3$ archetypes.</li>
-              <li><strong class="text-slate-200">PCA (Principal Component Analysis):</strong> Reduces 29 dimensions down to 2 principal components explaining &gt; 65% total variance for 2D clustering visualization.</li>
-              <li><strong class="text-slate-200">Discovered Personas:</strong> <em>Tech Leavers</em>, <em>Price-Sensitive Streamers</em>, and <em>Long-Term Anchors</em>.</li>
+            <ul class="space-y-1.5 text-xs text-muted list-disc list-inside">
+              <li><strong class="text-ink">Elbow Curve & Silhouette Scoring:</strong> Identified optimal cluster count $k=3$ archetypes.</li>
+              <li><strong class="text-ink">PCA (Principal Component Analysis):</strong> Reduces 29 dimensions down to 2 principal components explaining &gt; 65% total variance for 2D clustering visualization.</li>
+              <li><strong class="text-ink">Discovered Personas:</strong> <em>Tech Leavers</em>, <em>Price-Sensitive Streamers</em>, and <em>Long-Term Anchors</em>.</li>
             </ul>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-blue-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-ink-2">
             <span>Cluster Algorithm: KMeans(n=3)</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
         <!-- CONCEPT CARD 9: PRESCRIPTIVE RETENTION ENGINE -->
-        <div class="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between hover:border-indigo-500/50 transition-all">
+        <div class="panel rounded-sheet p-5 border border-rule flex flex-col justify-between hover:border-line-accent transition-colors">
           <div>
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-              <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <i data-lucide="cpu" class="w-4 h-4"></i> 9. Prescriptive AI Engine
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-rule">
+              <span class="text-xs font-semibold text-ok flex items-center gap-1.5">
+                <span data-lucide="cpu" class="w-4 h-4"></span> 9. Prescriptive AI Engine
               </span>
-              <span class="concept-tag px-2 py-0.5 rounded text-[10px] font-mono font-semibold">src/recommendations.py</span>
+              <span class="concept-tag px-2 py-1 rounded-field text-xs font-semibold">src/recommendations.py</span>
             </div>
-            <h3 class="text-base font-bold text-white mb-2">Algorithmic Playbook & ROI Optimization</h3>
-            <p class="text-xs text-slate-300 mb-3 leading-relaxed">
+            <h3 class="text-base font-semibold text-ink mb-2">Algorithmic Playbook & ROI Optimization</h3>
+            <p class="text-xs text-ink-2 mb-3 leading-relaxed">
               Bridges predictive intelligence (what *will* happen) with prescriptive intelligence (what *to do*):
             </p>
-            <ul class="space-y-1.5 text-xs text-slate-400 list-disc list-inside">
-              <li><strong class="text-slate-200">Risk Tier Categorization:</strong> Low ($&lt; 30\%$), Moderate ($30-60\%$), High ($60-80\%$), Critical ($&gt; 80\%$).</li>
-              <li><strong class="text-slate-200">Rule-Backed Interventions:</strong> Evaluates specific feature bottlenecks (e.g. Month-to-month + Fiber Optic $\to$ 1-Year renewal discount + Free Tech Support).</li>
-              <li><strong class="text-slate-200">Net Financial Upside:</strong> $\text{ROI} = (\Delta \text{Retained CLV} - \text{Discount Cost}) / \text{Discount Cost} \times 100\%$.</li>
+            <ul class="space-y-1.5 text-xs text-muted list-disc list-inside">
+              <li><strong class="text-ink">Risk Tier Categorization:</strong> Low ($&lt; 30\%$), Moderate ($30-60\%$), High ($60-80\%$), Critical ($&gt; 80\%$).</li>
+              <li><strong class="text-ink">Rule-Backed Interventions:</strong> Evaluates specific feature bottlenecks (e.g. Month-to-month + Fiber Optic $\to$ 1-Year renewal discount + Free Tech Support).</li>
+              <li><strong class="text-ink">Net Financial Upside:</strong> $\text{ROI} = (\Delta \text{Retained CLV} - \text{Discount Cost}) / \text{Discount Cost} \times 100\%$.</li>
             </ul>
           </div>
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-emerald-300 font-mono">
+          <div class="mt-4 pt-3 border-t border-rule flex items-center justify-between text-xs text-ok">
             <span>Prescriptive Policy Engine</span>
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span data-lucide="check-circle-2" class="w-4 h-4 text-ok"></span>
           </div>
         </div>
 
       </div>
 
       <!-- FULL END-TO-END PIPELINE ARCHITECTURE FLOWCHART -->
-      <div class="glass-card rounded-2xl p-6 border border-white/10">
-        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-          <i data-lucide="git-branch" class="w-4 h-4 text-indigo-400"></i>
+      <div class="panel rounded-sheet p-6 border border-rule">
+        <h3 class="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
+          <span data-lucide="git-branch" class="w-4 h-4 text-ink-2"></span>
           End-to-End Machine Learning System Architecture
         </h3>
         
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
           <!-- Step 1 -->
-          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 relative">
-            <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-bold flex items-center justify-center text-[10px] mb-2">1</span>
-            <h4 class="font-bold text-white mb-1">Data Ingestion</h4>
-            <p class="text-slate-400 text-[11px]">IBM Telco raw CSV (7,043 rows, 21 columns). Schema verification and automated download.</p>
+          <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule relative">
+            <span class="w-5 h-5 rounded-full bg-tint-accent text-ink-2 font-semibold flex items-center justify-center text-xs mb-2">1</span>
+            <h4 class="font-semibold text-ink mb-1">Data Ingestion</h4>
+            <p class="text-muted text-xs">IBM Telco raw CSV (7,043 rows, 21 columns). Schema verification and automated download.</p>
           </div>
 
           <!-- Step 2 -->
-          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 relative">
-            <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-bold flex items-center justify-center text-[10px] mb-2">2</span>
-            <h4 class="font-bold text-white mb-1">Leak-Free Pipeline</h4>
-            <p class="text-slate-400 text-[11px]">Stratified split, median imputation on train only, one-hot encoding ($k-1$), and standard scaling.</p>
+          <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule relative">
+            <span class="w-5 h-5 rounded-full bg-tint-accent text-ink-2 font-semibold flex items-center justify-center text-xs mb-2">2</span>
+            <h4 class="font-semibold text-ink mb-1">Leak-Free Pipeline</h4>
+            <p class="text-muted text-xs">Stratified split, median imputation on train only, one-hot encoding ($k-1$), and standard scaling.</p>
           </div>
 
           <!-- Step 3 -->
-          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 relative">
-            <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-bold flex items-center justify-center text-[10px] mb-2">3</span>
-            <h4 class="font-bold text-white mb-1">Model Training</h4>
-            <p class="text-slate-400 text-[11px]">5 Classifiers evaluated. XGBoost champion tuned with 5-fold CV & cost-sensitive thresholding.</p>
+          <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule relative">
+            <span class="w-5 h-5 rounded-full bg-tint-accent text-ink-2 font-semibold flex items-center justify-center text-xs mb-2">3</span>
+            <h4 class="font-semibold text-ink mb-1">Model Training</h4>
+            <p class="text-muted text-xs">5 Classifiers evaluated. XGBoost champion tuned with 5-fold CV & cost-sensitive thresholding.</p>
           </div>
 
           <!-- Step 4 -->
-          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 relative">
-            <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-bold flex items-center justify-center text-[10px] mb-2">4</span>
-            <h4 class="font-bold text-white mb-1">SHAP & Survival</h4>
-            <p class="text-slate-400 text-[11px]">Local & global feature attribution with SHAP. Kaplan-Meier and Cox survival hazard modeling.</p>
+          <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule relative">
+            <span class="w-5 h-5 rounded-full bg-tint-accent text-ink-2 font-semibold flex items-center justify-center text-xs mb-2">4</span>
+            <h4 class="font-semibold text-ink mb-1">SHAP & Survival</h4>
+            <p class="text-muted text-xs">Local & global feature attribution with SHAP. Kaplan-Meier and Cox survival hazard modeling.</p>
           </div>
 
           <!-- Step 5 -->
-          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-indigo-500/40 relative bg-indigo-950/20">
-            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-bold flex items-center justify-center text-[10px] mb-2">5</span>
-            <h4 class="font-bold text-emerald-300 mb-1">Production Web API</h4>
-            <p class="text-slate-300 text-[11px]">Pure Python HTTP microservice running live inference and interactive what-if simulation UI.</p>
+          <div class="p-3.5 rounded-sheet bg-paper-3 border border-line-accent relative bg-tint-accent">
+            <span class="w-5 h-5 rounded-full bg-tint-ok text-ok font-semibold flex items-center justify-center text-xs mb-2">5</span>
+            <h4 class="font-semibold text-ok mb-1">Production Web API</h4>
+            <p class="text-ink-2 text-xs">Pure Python HTTP microservice running live inference and interactive what-if simulation UI.</p>
           </div>
         </div>
       </div>
@@ -1606,14 +1251,12 @@
     </div>
 
     <!-- FOOTER WITH SYSTEM SPECS -->
-    <footer class="border-t border-white/10 bg-[#080d18] py-4 text-xs text-slate-500 mt-auto">
-      <div class="max-w-[1720px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <footer class="border-t border-rule bg-paper-2 py-4 text-xs text-muted mt-auto">
+      <div class="container-app flex flex-col sm:flex-row items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <span class="font-mono text-slate-400">IBM Telco CLV Engine</span>
-          <span>•</span>
+          <span class="text-muted">IBM Telco CLV Engine</span>
           <span>Trained on IBM Telco Dataset (7,043 Records)</span>
-          <span>•</span>
-          <span class="text-emerald-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Engine Online</span>
+          <span class="text-ok flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-ok"></span> Engine Online</span>
         </div>
         <div>
           <span>Academic Concepts, Math & Engineering Defense Hub Active</span>
@@ -1624,92 +1267,92 @@
   </div>
 
   <!-- MODAL: EXECUTIVE AUDIT REPORT DOSSIER (PRINT / SAVE PDF OPTIMIZED) -->
-  <div id="auditReportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 p-4">
-    <div class="glass-card rounded-2xl max-w-2xl w-full p-6 border border-white/20 shadow-2xl relative max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible">
+  <div id="auditReportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-scrim opacity-0 pointer-events-none transition-opacity duration-300 p-4">
+    <div class="panel rounded-sheet max-w-2xl w-full p-6 border border-rule relative max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible">
       
       <!-- BRANDED PRINT HEADER WATERMARK (Visible in Print / PDF Dossier) -->
       <div class="print-header-watermark hidden">
         <div>
-          <span class="font-extrabold tracking-wider text-slate-900 text-xs">IBM TELCO AI INTELLIGENCE PLATFORM v1.08</span>
-          <p class="text-[9px] text-slate-500 font-mono">Confidential Executive Risk Audit Dossier // Sacred Test Split (Holdout 20%)</p>
+          <span class="font-semibold text-ink text-xs">IBM TELCO AI INTELLIGENCE PLATFORM v1.08</span>
+          <p class="text-xs text-muted">Confidential Executive Risk Audit Dossier // Sacred Test Split (Holdout 20%)</p>
         </div>
-        <div class="text-right text-[9px] text-slate-500 font-mono" id="printAuditTimestamp">
+        <div class="text-right text-xs text-muted" id="printAuditTimestamp">
           Evaluation Timestamp: 2026-11-04 11:15 UTC
         </div>
       </div>
 
       <!-- SCREEN HEADER (Hidden in Print) -->
-      <div class="flex items-center justify-between pb-3 border-b border-white/10 no-print">
+      <div class="flex items-center justify-between pb-3 border-b border-rule no-print">
         <div class="flex items-center gap-2">
-          <div class="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
-            <i data-lucide="file-check" class="w-5 h-5"></i>
+          <div class="p-2 rounded-sheet bg-tint-accent text-ink-2">
+            <span data-lucide="file-check" class="w-5 h-5"></span>
           </div>
           <div>
-            <h3 class="text-base font-bold text-white">Executive Case Audit & Risk Dossier</h3>
-            <p class="text-xs text-slate-400 font-mono">IBM Telco Customer Churn & CLV Intelligence Engine</p>
+            <h3 class="text-base font-semibold text-ink">Executive Case Audit & Risk Dossier</h3>
+            <p class="text-xs text-muted">IBM Telco Customer Churn & CLV Intelligence Engine</p>
           </div>
         </div>
-        <button onclick="closeAuditModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 close-modal-btn">
-          <i data-lucide="x" class="w-4 h-4"></i>
+        <button onclick="closeAuditModal()" class="p-1.5 rounded-sheet bg-paper-3 hover:bg-paper-3 text-ink-2 close-modal-btn">
+          <span data-lucide="x" class="w-4 h-4"></span>
         </button>
       </div>
 
       <!-- ACCOUNT SNAPSHOT BANNER -->
-      <div class="mt-3.5 p-3 rounded-xl bg-slate-900/80 border border-white/5 grid grid-cols-2 sm:grid-cols-6 gap-2 text-[10px] print-box-neutral">
+      <div class="mt-3.5 p-3 rounded-sheet bg-paper-3 border border-rule grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs print-box-neutral">
         <div>
-          <span class="text-slate-400 block print:text-slate-600 font-medium">Customer ID</span>
-          <span class="font-mono font-bold text-white print:text-slate-900" id="modalCustomerReportId">TELCO-8841-BXV</span>
+          <span class="text-muted block print:text-muted font-medium">Customer ID</span>
+          <span class="font-semibold text-ink print:text-ink" id="modalCustomerReportId">TELCO-8841-BXV</span>
         </div>
         <div>
-          <span class="text-slate-400 block print:text-slate-600 font-medium">Tenure</span>
-          <span class="font-mono font-bold text-white print:text-slate-900" id="modalReportTenure">6 Months</span>
+          <span class="text-muted block print:text-muted font-medium">Tenure</span>
+          <span class="font-semibold text-ink print:text-ink" id="modalReportTenure">6 Months</span>
         </div>
         <div>
-          <span class="text-slate-400 block print:text-slate-600 font-medium">Monthly Charge</span>
-          <span class="font-mono font-bold text-white print:text-slate-900" id="modalReportMonthly">$92.50</span>
+          <span class="text-muted block print:text-muted font-medium">Monthly Charge</span>
+          <span class="font-semibold text-ink print:text-ink" id="modalReportMonthly">$92.50</span>
         </div>
         <div>
-          <span class="text-slate-400 block print:text-slate-600 font-medium">Contract Term</span>
-          <span class="font-mono font-bold text-white print:text-slate-900" id="modalReportContract">Month-to-month</span>
+          <span class="text-muted block print:text-muted font-medium">Contract Term</span>
+          <span class="font-semibold text-ink print:text-ink" id="modalReportContract">Month-to-month</span>
         </div>
         <div>
-          <span class="text-slate-400 block print:text-slate-600 font-medium">Connection</span>
-          <span class="font-mono font-bold text-white print:text-slate-900" id="modalReportInternet">Fiber optic</span>
+          <span class="text-muted block print:text-muted font-medium">Connection</span>
+          <span class="font-semibold text-ink print:text-ink" id="modalReportInternet">Fiber optic</span>
         </div>
         <div>
-          <span class="text-slate-400 block print:text-slate-600 font-medium">Tech Support</span>
-          <span class="font-mono font-bold text-white print:text-slate-900" id="modalReportSupport">None</span>
+          <span class="text-muted block print:text-muted font-medium">Tech Support</span>
+          <span class="font-semibold text-ink print:text-ink" id="modalReportSupport">None</span>
         </div>
       </div>
 
       <!-- MACRO FINANCIAL & VERDICT METRICS (HIGH CONTRAST PALETTE) -->
-      <div class="mt-3.5 space-y-3.5 text-xs text-slate-300">
+      <div class="mt-3.5 space-y-3.5 text-xs text-ink-2">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 print-box-neutral">
-            <span class="text-slate-400 block text-[10px] uppercase font-medium">Predicted Churn Risk</span>
-            <span class="text-xl font-bold font-mono text-contrast-red" id="modalReportRisk">78.0%</span>
+          <div class="p-3 rounded-sheet bg-paper-3 border border-rule print-box-neutral">
+            <span class="text-muted block text-xs font-medium">Predicted Churn Risk</span>
+            <span class="text-xl font-semibold text-risk" id="modalReportRisk">78.0%</span>
           </div>
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 print-box-neutral">
-            <span class="text-slate-400 block text-[10px] uppercase font-medium">Risk Tier Verdict</span>
-            <span class="text-sm font-bold font-mono px-2 py-0.5 rounded uppercase inline-block mt-0.5" id="modalReportTier">Critical Risk</span>
+          <div class="p-3 rounded-sheet bg-paper-3 border border-rule print-box-neutral">
+            <span class="text-muted block text-xs font-medium">Risk Tier Verdict</span>
+            <span class="text-sm font-semibold px-2 py-1 rounded-field inline-block mt-0.5" id="modalReportTier">Critical Risk</span>
           </div>
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 print-box-neutral">
-            <span class="text-slate-400 block text-[10px] uppercase font-medium">Annual Rev at Risk</span>
-            <span class="text-lg font-bold font-mono text-white print:text-slate-900" id="modalReportRev">$1,110.00</span>
+          <div class="p-3 rounded-sheet bg-paper-3 border border-rule print-box-neutral">
+            <span class="text-muted block text-xs font-medium">Annual Rev at Risk</span>
+            <span class="text-lg font-semibold text-ink print:text-ink" id="modalReportRev">$1,110.00</span>
           </div>
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 print-box-neutral">
-            <span class="text-slate-400 block text-[10px] uppercase font-medium">Dynamic CLV (NPV)</span>
-            <span class="text-lg font-bold font-mono text-contrast-emerald" id="modalReportCLV">$1,850.00</span>
+          <div class="p-3 rounded-sheet bg-paper-3 border border-rule print-box-neutral">
+            <span class="text-muted block text-xs font-medium">Dynamic CLV (NPV)</span>
+            <span class="text-lg font-semibold text-ok" id="modalReportCLV">$1,850.00</span>
           </div>
         </div>
 
         <!-- DYNAMIC SHAP EXPLAINABILITY BREAKDOWN -->
-        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 space-y-2 print-box-neutral">
+        <div class="p-3.5 rounded-sheet bg-paper-3 border border-rule space-y-2 print-box-neutral">
           <div class="flex items-center justify-between">
-            <h4 class="font-bold text-white uppercase tracking-wider text-[11px] print:text-slate-900">Primary Risk Bottlenecks & SHAP Attributions</h4>
-            <span class="text-[10px] font-mono text-slate-400">Baseline Churn: 26.5%</span>
+            <h4 class="font-semibold text-ink text-xs print:text-ink">Primary Risk Bottlenecks & SHAP Attributions</h4>
+            <span class="text-xs text-muted">Baseline Churn: 26.5%</span>
           </div>
-          <p class="text-slate-400 leading-relaxed text-[11px] print:text-slate-700" id="modalReportShapNote">
+          <p class="text-muted leading-relaxed text-xs print:text-ink" id="modalReportShapNote">
             Subscriber is currently on a Month-to-Month Fiber Optic plan with high billing sensitivity ($92.50/mo) and zero active value-added protection services.
           </p>
           <div class="space-y-1.5 pt-1" id="modalReportShapBars">
@@ -1718,12 +1361,12 @@
         </div>
 
         <!-- TAILORED PRESCRIPTIVE ACTION & ROI -->
-        <div class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1.5 print-box-neutral">
+        <div class="p-3.5 rounded-sheet bg-tint-ok border border-line-ok space-y-1.5 print-box-neutral">
           <div class="flex items-center justify-between">
-            <h4 class="font-bold text-emerald-300 uppercase tracking-wider text-[11px] print:text-emerald-800">Prescriptive Retention Intervention</h4>
-            <span class="text-[10px] font-mono font-bold text-emerald-400 print:text-emerald-800" id="modalReportRoiText">+1,420% ROI</span>
+            <h4 class="font-semibold text-ok text-xs print:text-ok">Prescriptive Retention Intervention</h4>
+            <span class="text-xs font-semibold text-ok print:text-ok" id="modalReportRoiText">+1,420% ROI</span>
           </div>
-          <p class="text-slate-300 leading-relaxed text-[11px] print:text-slate-700" id="modalReportAction">
+          <p class="text-ink-2 leading-relaxed text-xs print:text-ink" id="modalReportAction">
             Deploy 12-Month Loyalty Contract Discount + Free Tech Support Add-on. Projected risk reduction drops churn from 78% down to 32% (-46%), preserving $890 net CLV margin.
           </p>
         </div>
@@ -1731,17 +1374,17 @@
 
       <!-- BRANDED PRINT FOOTER WATERMARK (Visible in Print / PDF Dossier) -->
       <div class="print-footer-watermark hidden">
-        <span>Confidential — IBM Telco AI Intelligence Engine v1.08 — Sacred Test Split Verified (No Data Leakage)</span>
-        <span>Asymmetric Optimization ($500 Lost Account vs $50 Retention Offer) — Page 1 of 1</span>
+        <span>Confidential: IBM Telco AI Intelligence Engine v1.08, Sacred Test Split Verified (No Data Leakage)</span>
+        <span>Asymmetric Optimization ($500 Lost Account vs $50 Retention Offer), Page 1 of 1</span>
       </div>
 
       <!-- SCREEN MODAL ACTION BUTTONS (Hidden in Print) -->
-      <div class="mt-5 pt-3.5 border-t border-white/10 flex items-center justify-end gap-3 modal-actions no-print">
-        <button onclick="closeAuditModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors">
-          Close Dossier
+      <div class="mt-5 pt-3.5 border-t border-rule flex items-center justify-end gap-3 modal-actions no-print">
+        <button type="button" onclick="closeAuditModal()" class="whitespace-nowrap px-4 py-2 rounded-sheet bg-paper-3 hover:bg-paper-3 text-xs font-semibold text-ink-2 transition-colors">
+          Close dossier
         </button>
-        <button onclick="printAuditDossier()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition-all">
-          <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+        <button onclick="printAuditDossier()" class="px-4 py-2 rounded-sheet bg-board hover:bg-board text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors">
+          <span data-lucide="printer" class="w-3.5 h-3.5"></span>
           <span>Print / Save PDF</span>
         </button>
       </div>
@@ -1749,18 +1392,21 @@
   </div>
 
   <!-- TOAST NOTIFICATION CONTAINER -->
-  <div id="toastNotification" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
-    <div class="bg-indigo-950 border border-indigo-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
-      <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>
+  <div id="toastNotification" class="fixed bottom-6 right-6 z-50 translate-y-20 opacity-0 transition-[transform,opacity] duration-300 pointer-events-none">
+    <div class="bg-board border border-line-accent text-board-type px-4 py-3 rounded-sheet flex items-center gap-3">
+      <span data-lucide="check-circle-2" class="w-5 h-5 text-ok"></span>
       <div>
-        <p class="text-xs font-semibold text-white" id="toastTitle">Notification</p>
-        <p class="text-[11px] text-slate-300" id="toastMessage">Action completed successfully.</p>
+        <p class="text-xs font-semibold text-board-type" id="toastTitle">Notification</p>
+        <p class="text-xs text-board-type" id="toastMessage">Action completed successfully.</p>
       </div>
     </div>
   </div>
 
   <!-- CLIENT-SIDE SIMULATION, ROUTING & LIVE BACKEND API INTEGRATION ENGINE -->
   <script>
+    const setTextIfPresent = (id, value) => { const el = document.getElementById(id); if (el) el.innerText = value; };
+    // Resolve a design token to a concrete colour string Chart.js and canvas can paint
+    const T = (name) => { const probe = document.createElement('span'); probe.style.color = `var(${name})`; document.body.appendChild(probe); const colour = getComputedStyle(probe).color; probe.remove(); return colour; };
     let survivalChartInstance = null;
     let waterfallChartInstance = null;
     let financialChartInstance = null;
@@ -1789,23 +1435,23 @@
       vizView.classList.add('hidden');
       conceptsView.classList.add('hidden');
 
-      btnDash.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap';
-      btnViz.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap';
-      btnConcepts.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap';
+      btnDash.className = 'app-tab';
+      btnViz.className = 'app-tab';
+      btnConcepts.className = 'app-tab';
 
       if (viewName === 'visualizer') {
         vizView.classList.remove('hidden');
-        btnViz.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all bg-emerald-600 text-white shadow-md shadow-emerald-600/30 whitespace-nowrap';
+        btnViz.className = 'app-tab is-active';
         updateVisualizerCharts();
       } else if (viewName === 'concepts') {
         conceptsView.classList.remove('hidden');
-        btnConcepts.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all bg-amber-600 text-white shadow-md shadow-amber-600/30 whitespace-nowrap';
+        btnConcepts.className = 'app-tab is-active';
         if (window.renderMathInElement) {
           renderMathInElement(conceptsView);
         }
       } else {
         dashView.classList.remove('hidden');
-        btnDash.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all bg-indigo-600 text-white shadow-md shadow-indigo-600/30 whitespace-nowrap';
+        btnDash.className = 'app-tab is-active';
       }
 
       lucide.createIcons();
@@ -1827,8 +1473,8 @@
               {
                 label: 'Baseline S0(t) Hazard',
                 data: [1.0, 0.72, 0.51, 0.36, 0.25, 0.18, 0.13, 0.09, 0.06, 0.04, 0.03, 0.02, 0.01],
-                borderColor: '#ef4444', // Accessible Red
-                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                borderColor: T('--color-risk'), // Accessible Red
+                backgroundColor: T('--tint-risk'),
                 borderWidth: 2.5,
                 fill: '+1',
                 tension: 0.35,
@@ -1838,8 +1484,8 @@
               {
                 label: 'Mitigated Survival S_mitigated(t)',
                 data: [1.0, 0.94, 0.89, 0.84, 0.79, 0.75, 0.71, 0.67, 0.63, 0.59, 0.55, 0.52, 0.49],
-                borderColor: '#10b981', // Deep Emerald
-                backgroundColor: 'rgba(16, 185, 129, 0.22)',
+                borderColor: T('--color-ok'), // Deep Emerald
+                backgroundColor: T('--tint-ok'),
                 borderWidth: 3,
                 fill: false,
                 tension: 0.35,
@@ -1855,8 +1501,8 @@
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(15, 23, 42, 0.96)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
+                backgroundColor: T('--color-board'),
+                borderColor: T('--color-rule-2'),
                 borderWidth: 1,
                 padding: 10,
                 callbacks: {
@@ -1883,16 +1529,16 @@
             },
             scales: {
               x: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } }
+                grid: { color: T('--color-rule') },
+                ticks: { color: T('--color-muted'), font: { family: 'Geist Mono', size: 10 } }
               },
               y: {
                 min: 0,
                 max: 1.05,
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                grid: { color: T('--color-rule') },
                 ticks: {
-                  color: '#94a3b8',
-                  font: { family: 'JetBrains Mono', size: 10 },
+                  color: T('--color-muted'),
+                  font: { family: 'Geist Mono', size: 10 },
                   callback: val => `${(val * 100).toFixed(0)}%`
                 }
               }
@@ -1910,7 +1556,7 @@
             labels: ['Baseline Hazard', 'Contract Lock', 'Tech Support', 'Auto-Pay Direct', 'Rate Rebate', 'Mitigated Risk'],
             datasets: [{
               data: [78, -32, -16, -12, 0, 18],
-              backgroundColor: ['#ef4444', '#3b82f6', '#10b981', '#6366f1', '#f59e0b', '#10b981'],
+              backgroundColor: [T('--color-risk'), T('--color-ink-2'), T('--color-ok'), T('--color-accent-2'), T('--color-caution'), T('--color-ok')],
               borderRadius: 6
             }]
           },
@@ -1920,8 +1566,8 @@
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(15, 23, 42, 0.96)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
+                backgroundColor: T('--color-board'),
+                borderColor: T('--color-rule-2'),
                 borderWidth: 1,
                 padding: 10,
                 callbacks: {
@@ -1955,11 +1601,11 @@
             scales: {
               x: {
                 grid: { display: false },
-                ticks: { color: '#94a3b8', font: { size: 9 } }
+                ticks: { color: T('--color-muted'), font: { size: 9 } }
               },
               y: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 9 }, callback: v => `${v}%` }
+                grid: { color: T('--color-rule') },
+                ticks: { color: T('--color-muted'), font: { family: 'Geist Mono', size: 9 }, callback: v => `${v}%` }
               }
             }
           }
@@ -1975,7 +1621,7 @@
             labels: ['Incentive Cost', 'Preserved CLV', 'Net Margin Saved'],
             datasets: [{
               data: [75, 1495, 1420],
-              backgroundColor: ['#ef4444', '#6366f1', '#10b981'],
+              backgroundColor: [T('--color-risk'), T('--color-ink-2'), T('--color-ok')],
               borderRadius: 6
             }]
           },
@@ -1985,8 +1631,8 @@
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(15, 23, 42, 0.96)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
+                backgroundColor: T('--color-board'),
+                borderColor: T('--color-rule-2'),
                 borderWidth: 1,
                 padding: 10,
                 callbacks: {
@@ -2024,11 +1670,11 @@
             scales: {
               x: {
                 grid: { display: false },
-                ticks: { color: '#94a3b8', font: { size: 9 } }
+                ticks: { color: T('--color-muted'), font: { size: 9 } }
               },
               y: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 9 }, callback: v => `$${v}` }
+                grid: { color: T('--color-rule') },
+                ticks: { color: T('--color-muted'), font: { family: 'Geist Mono', size: 9 }, callback: v => `$${v}` }
               }
             }
           }
@@ -2046,14 +1692,14 @@
               label: 'Subscriber Volume',
               data: [1840, 1120, 890, 710, 520, 480, 420, 390, 360, 303], // Sums to exactly 7,043 customers
               backgroundColor: [
-                '#10b981', '#10b981', '#10b981', '#10b981', // Retained (<45%)
-                '#f59e0b', '#f59e0b', '#f59e0b', '#f59e0b', // Moderate (45-79%)
-                '#ef4444', '#ef4444'                         // Critical (≥80%)
+                T('--color-ok'), T('--color-ok'), T('--color-ok'), T('--color-ok'), // Retained (<45%)
+                T('--color-caution'), T('--color-caution'), T('--color-caution'), T('--color-caution'), // Moderate (45-79%)
+                T('--color-risk'), T('--color-risk')                         // Critical (≥80%)
               ],
               borderColor: [
-                '#059669', '#059669', '#059669', '#059669',
-                '#d97706', '#d97706', '#d97706', '#d97706',
-                '#dc2626', '#dc2626'
+                T('--color-ok'), T('--color-ok'), T('--color-ok'), T('--color-ok'),
+                T('--color-caution'), T('--color-caution'), T('--color-caution'), T('--color-caution'),
+                T('--color-risk'), T('--color-risk')
               ],
               borderWidth: 1.5,
               borderRadius: 6
@@ -2065,8 +1711,8 @@
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(15, 23, 42, 0.96)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
+                backgroundColor: T('--color-board'),
+                borderColor: T('--color-rule-2'),
                 borderWidth: 1,
                 padding: 10,
                 callbacks: {
@@ -2088,13 +1734,13 @@
             scales: {
               x: {
                 grid: { display: false },
-                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 9 } }
+                ticks: { color: T('--color-muted'), font: { family: 'Geist Mono', size: 9 } }
               },
               y: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                grid: { color: T('--color-rule') },
                 ticks: {
-                  color: '#94a3b8',
-                  font: { family: 'JetBrains Mono', size: 9 },
+                  color: T('--color-muted'),
+                  font: { family: 'Geist Mono', size: 9 },
                   callback: v => `${v}`
                 }
               }
@@ -2169,13 +1815,13 @@
       const markerElem = document.getElementById('distCustomerMarker');
       if (markerElem) {
         if (currentProb >= 80) {
-          markerElem.className = 'px-2 py-0.5 rounded font-mono text-[11px] bg-red-500/20 text-red-300 border border-red-500/40 critical-badge-pulse';
+          markerElem.className = 'px-2 py-1 rounded-field text-xs bg-tint-risk text-risk border border-line-risk';
           markerElem.innerText = `${currentProb.toFixed(1)}% Churn Probability (Critical Risk Zone)`;
         } else if (currentProb >= 45) {
-          markerElem.className = 'px-2 py-0.5 rounded font-mono text-[11px] bg-amber-500/20 text-amber-300 border border-amber-500/40';
+          markerElem.className = 'px-2 py-1 rounded-field text-xs bg-tint-caution text-caution border border-line-caution';
           markerElem.innerText = `${currentProb.toFixed(1)}% Churn Probability (Moderate Risk Zone)`;
         } else {
-          markerElem.className = 'px-2 py-0.5 rounded font-mono text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+          markerElem.className = 'px-2 py-1 rounded-field text-xs bg-tint-ok text-ok border border-line-ok';
           markerElem.innerText = `${currentProb.toFixed(1)}% Churn Probability (Retained Healthy Zone)`;
         }
       }
@@ -2331,13 +1977,13 @@
     function highlightContractCard() {
       const radios = document.getElementsByName('contractType');
       radios.forEach(radio => {
-        const card = radio.closest('.contract-card');
+        const card = radio.closest('.contract-option');
         if (radio.checked) {
-          card.classList.add('border-indigo-500', 'bg-indigo-950/40', 'shadow-md', 'shadow-indigo-500/10');
-          card.classList.remove('border-white/10', 'bg-slate-950/40');
+          card.classList.add('border-line-accent', 'bg-tint-accent');
+          card.classList.remove('border-rule', 'bg-paper-3');
         } else {
-          card.classList.remove('border-indigo-500', 'bg-indigo-950/40', 'shadow-md', 'shadow-indigo-500/10');
-          card.classList.add('border-white/10', 'bg-slate-950/40');
+          card.classList.remove('border-line-accent', 'bg-tint-accent');
+          card.classList.add('border-rule', 'bg-paper-3');
         }
       });
     }
@@ -2513,31 +2159,29 @@
 
       // Requirement 1 & 3: Visual Risk Badge Pulsing & High-Contrast Accessible Colors
       if (percentage >= 80) {
-        circle.style.stroke = '#ef4444'; // Accessible Red
-        badge.className = 'px-2.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-red-500/25 text-red-300 border-2 border-red-500 critical-badge-pulse';
-        badge.innerText = '⚠️ Critical Risk (≥80%)';
-        container.className = 'md:col-span-5 glass-card rounded-2xl p-5 border border-red-500 flex flex-col items-center justify-center text-center transition-all duration-500 relative overflow-hidden critical-border-pulse';
-        summaryText.innerText = 'Extremely elevated churn propensity. Urgent retention intervention required.';
+        circle.style.stroke = 'var(--color-risk)';
+        badge.className = 'px-2.5 py-1 rounded-field text-xs font-semibold bg-tint-risk text-risk border-2 border-line-risk';
+        badge.innerText = 'Critical risk (80% or more)';
+        container.className = 'md:col-span-5 panel rounded-sheet p-5 border border-line-risk flex flex-col items-center justify-center text-center transition-colors duration-500 relative overflow-hidden';
+        summaryText.innerText = 'Very high churn propensity. Urgent retention intervention required.';
         document.getElementById('priorityTierDisplay').innerText = 'Tier 1 - Immediate VIP Retention';
-        document.getElementById('priorityTierDisplay').className = 'text-contrast-red font-mono font-bold';
+        document.getElementById('priorityTierDisplay').className = 'text-risk font-semibold';
       } else if (percentage >= 45) {
-        circle.style.stroke = '#f59e0b'; // Muted Amber
-        container.classList.remove('critical-border-pulse');
-        badge.className = 'px-2.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        circle.style.stroke = 'var(--color-caution)';
+        badge.className = 'px-2.5 py-1 rounded-field text-xs font-semibold bg-tint-caution text-caution border border-line-caution';
         badge.innerText = 'Moderate Risk';
-        container.className = 'md:col-span-5 glass-card rounded-2xl p-5 border border-amber-500/40 flex flex-col items-center justify-center text-center transition-all duration-500 relative overflow-hidden';
+        container.className = 'md:col-span-5 panel rounded-sheet p-5 border border-line-caution flex flex-col items-center justify-center text-center transition-colors duration-500 relative overflow-hidden';
         summaryText.innerText = 'Notable sensitivity to competitor promotions or billing friction. Proactive engagement recommended.';
         document.getElementById('priorityTierDisplay').innerText = 'Tier 2 - Proactive Engagement';
-        document.getElementById('priorityTierDisplay').className = 'text-contrast-amber font-mono font-semibold';
+        document.getElementById('priorityTierDisplay').className = 'text-caution font-semibold';
       } else {
-        circle.style.stroke = '#10b981'; // Deep Emerald
-        container.classList.remove('critical-border-pulse');
-        badge.className = 'px-2.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        circle.style.stroke = 'var(--color-ok)';
+        badge.className = 'px-2.5 py-1 rounded-field text-xs font-semibold bg-tint-ok text-ok border border-line-ok';
         badge.innerText = 'Low Risk (Retained)';
-        container.className = 'md:col-span-5 glass-card rounded-2xl p-5 border border-emerald-500/40 flex flex-col items-center justify-center text-center transition-all duration-500 relative overflow-hidden glass-glow-emerald';
+        container.className = 'md:col-span-5 panel rounded-sheet p-5 border border-line-ok flex flex-col items-center justify-center text-center transition-colors duration-500 relative overflow-hidden';
         summaryText.innerText = 'High retention probability. Prime candidate for cross-selling or account expansion.';
         document.getElementById('priorityTierDisplay').innerText = 'Tier 3 - Stable / Retained';
-        document.getElementById('priorityTierDisplay').className = 'text-contrast-emerald font-mono font-semibold';
+        document.getElementById('priorityTierDisplay').className = 'text-ok font-semibold';
       }
 
       const monthly = payload.MonthlyCharges;
@@ -2550,16 +2194,16 @@
       document.getElementById('annualRevAtRiskDisplay').innerText = `$${Math.round(annualRisk).toLocaleString()}`;
 
       // Comparison metrics
-      document.getElementById('compRiskBefore').innerText = `${percentage}%`;
+      setTextIfPresent('compRiskBefore', `${percentage}%`);
       const postInterventionRisk = Math.max(12, Math.round(percentage * 0.42));
-      document.getElementById('compRiskAfter').innerText = `${postInterventionRisk}%`;
-      document.getElementById('compTenureBefore').innerText = `${expectedRemainingMonths} Mos`;
+      setTextIfPresent('compRiskAfter', `${postInterventionRisk}%`);
+      setTextIfPresent('compTenureBefore', `${expectedRemainingMonths} Mos`);
       const postInterventionTenure = expectedRemainingMonths + 24;
-      document.getElementById('compTenureAfter').innerText = `${postInterventionTenure} Mos`;
+      setTextIfPresent('compTenureAfter', `${postInterventionTenure} Mos`);
       
       const postInterventionVal = Math.round(monthly * postInterventionTenure * 0.90);
-      document.getElementById('compValBefore').innerText = `$${Math.round(baselineCLV).toLocaleString()}`;
-      document.getElementById('compValAfter').innerText = `$${postInterventionVal.toLocaleString()}`;
+      setTextIfPresent('compValBefore', `$${Math.round(baselineCLV).toLocaleString()}`);
+      setTextIfPresent('compValAfter', `$${postInterventionVal.toLocaleString()}`);
 
       const retrievable = postInterventionVal - baselineCLV;
       document.getElementById('retrievableCLVAmount').innerText = `+$${Math.max(150, Math.round(retrievable)).toLocaleString()}`;
@@ -2597,8 +2241,8 @@
       features.forEach(item => {
         let row = document.getElementById(`shap-row-${item.id}`);
         const isPushingUp = item.val >= 0;
-        const colorClass = isPushingUp ? 'bg-red-500' : 'bg-emerald-500';
-        const textColor = isPushingUp ? 'text-red-400' : 'text-emerald-400';
+        const colorClass = isPushingUp ? 'bg-risk' : 'bg-ok';
+        const textColor = isPushingUp ? 'text-risk' : 'text-ok';
         const sign = isPushingUp ? '+' : '';
         const widthPct = Math.min(100, Math.max(12, Math.abs(item.val) * 220));
 
@@ -2608,10 +2252,10 @@
           row.className = 'space-y-1';
           row.innerHTML = `
             <div class="flex justify-between items-center text-xs">
-              <span class="shap-label text-slate-300 font-medium">${item.label}</span>
-              <span class="shap-val ${textColor} font-mono font-bold">${sign}${item.val.toFixed(2)} SHAP</span>
+              <span class="shap-label text-ink-2 font-medium">${item.label}</span>
+              <span class="shap-val ${textColor} font-semibold">${sign}${item.val.toFixed(2)} SHAP</span>
             </div>
-            <div class="shap-track w-full bg-slate-950/80 rounded-full h-2 overflow-hidden flex ${isPushingUp ? 'justify-start' : 'justify-end'} border border-white/5">
+            <div class="shap-track w-full bg-paper-3 rounded-full h-2 overflow-hidden flex ${isPushingUp ? 'justify-start' : 'justify-end'} border border-rule">
               <div class="shap-bar ${colorClass} shap-bar-fill h-full rounded-full" style="width: ${widthPct}%"></div>
             </div>
           `;
@@ -2625,11 +2269,11 @@
 
           if (labelSpan) labelSpan.innerText = item.label;
           if (valSpan) {
-            valSpan.className = `shap-val ${textColor} font-mono font-bold`;
+            valSpan.className = `shap-val ${textColor} font-semibold`;
             valSpan.innerText = `${sign}${item.val.toFixed(2)} SHAP`;
           }
           if (track) {
-            track.className = `shap-track w-full bg-slate-950/80 rounded-full h-2 overflow-hidden flex ${isPushingUp ? 'justify-start' : 'justify-end'} border border-white/5`;
+            track.className = `shap-track w-full bg-paper-3 rounded-full h-2 overflow-hidden flex ${isPushingUp ? 'justify-start' : 'justify-end'} border border-rule`;
           }
           if (bar) {
             bar.className = `shap-bar ${colorClass} shap-bar-fill h-full rounded-full`;
@@ -2642,7 +2286,7 @@
     async function runSimulatedInference() {
       const btn = document.getElementById('btnRunInference');
       const originalText = btn.innerHTML;
-      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Running XGBoost Inference (14ms)...`;
+      btn.innerHTML = `<span data-lucide="loader-2" class="w-4 h-4 animate-spin"></span> Running XGBoost Inference (14ms)...`;
       btn.disabled = true;
 
       await executeInference();
@@ -2706,16 +2350,16 @@
       
       const modalTier = document.getElementById('modalReportTier');
       if (riskVal >= 80) {
-        modalRisk.className = 'text-xl font-bold font-mono text-contrast-red';
-        modalTier.className = 'text-xs font-bold font-mono px-2 py-0.5 rounded uppercase inline-block bg-red-500/20 text-red-300 border border-red-500/40';
+        modalRisk.className = 'text-xl font-semibold text-risk';
+        modalTier.className = 'text-xs font-semibold px-2 py-1 rounded-field inline-block bg-tint-risk text-risk border border-line-risk';
         modalTier.innerText = 'Critical Risk (≥80%)';
       } else if (riskVal >= 45) {
-        modalRisk.className = 'text-xl font-bold font-mono text-contrast-amber';
-        modalTier.className = 'text-xs font-bold font-mono px-2 py-0.5 rounded uppercase inline-block bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        modalRisk.className = 'text-xl font-semibold text-caution';
+        modalTier.className = 'text-xs font-semibold px-2 py-1 rounded-field inline-block bg-tint-caution text-caution border border-line-caution';
         modalTier.innerText = 'Moderate Risk';
       } else {
-        modalRisk.className = 'text-xl font-bold font-mono text-contrast-emerald';
-        modalTier.className = 'text-xs font-bold font-mono px-2 py-0.5 rounded uppercase inline-block bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        modalRisk.className = 'text-xl font-semibold text-ok';
+        modalTier.className = 'text-xs font-semibold px-2 py-1 rounded-field inline-block bg-tint-ok text-ok border border-line-ok';
         modalTier.innerText = 'Low Risk (Retained)';
       }
 
@@ -2744,10 +2388,10 @@
         dossierFeatures.forEach(item => {
           const isRisk = item.val >= 0;
           const sign = isRisk ? '+' : '';
-          const color = isRisk ? 'text-red-500 font-bold' : 'text-emerald-500 font-bold';
+          const color = isRisk ? 'text-risk font-semibold' : 'text-ok font-semibold';
           const row = document.createElement('div');
-          row.className = 'flex justify-between items-center text-[11px] py-0.5 border-b border-white/5 print:border-slate-200';
-          row.innerHTML = `<span class="text-slate-300 print:text-slate-800">${item.name}</span><span class="${color} font-mono">${sign}${item.val.toFixed(2)} SHAP</span>`;
+          row.className = 'flex justify-between items-center text-xs py-1 border-b border-rule print:border-rule';
+          row.innerHTML = `<span class="text-ink-2 print:text-ink">${item.name}</span><span class="${color}">${sign}${item.val.toFixed(2)} SHAP</span>`;
           shapBarsContainer.appendChild(row);
         });
       }
